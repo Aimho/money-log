@@ -1,0 +1,82 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: Ceremony notebook
+          - heading "행사 이름을 입력해 주세요" [level=1] [ref=e11]
+          - paragraph [ref=e12]: 아직 행사 정보가 비어 있어요. 이름과 날짜를 저장하면 장부를 구분하기 쉬워집니다.
+        - generic [ref=e13]:
+          - generic [ref=e14]: 날짜 미설정
+          - generic [ref=e18]: 전체 2건
+          - button "행사 정보 입력" [ref=e19] [cursor=pointer]
+    - main [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e29]:
+            - generic [ref=e31]:
+              - generic [ref=e32]: 전체 장부
+              - generic [ref=e34]:
+                - paragraph [ref=e35]: 전체 합계
+                - heading "15만 원" [level=2] [ref=e36]
+            - generic [ref=e40]:
+              - generic [ref=e41]: 2명 기록
+              - generic [ref=e47]:
+                - paragraph [ref=e48]: 집계 메모
+                - paragraph [ref=e49]: 저장된 전체 항목을 한 장부 흐름으로 바로 합산해 보여줍니다.
+          - generic [ref=e50]:
+            - generic [ref=e51]:
+              - paragraph [ref=e52]: 평균 금액
+              - paragraph [ref=e53]: 7.5만 원
+              - paragraph [ref=e54]: 기록 1건당 평균
+            - generic [ref=e55]:
+              - paragraph [ref=e56]: 그룹 수
+              - paragraph [ref=e57]: 2개
+              - paragraph [ref=e58]: 2건 표시 중
+        - generic [ref=e59]:
+          - generic [ref=e61]:
+            - heading "그룹 필터" [level=2] [ref=e62]
+            - paragraph [ref=e63]: 차분한 회색 계열 점으로 그룹을 구분하고, 선택 상태만 초록색으로 강조합니다.
+          - generic [ref=e64]:
+            - button "전체 2" [pressed] [ref=e65] [cursor=pointer]:
+              - generic [ref=e66]: 전체
+              - generic [ref=e67]: "2"
+            - button "가족 1" [ref=e68] [cursor=pointer]:
+              - generic [ref=e70]: 가족
+              - generic [ref=e71]: "1"
+            - button "친구 1" [ref=e72] [cursor=pointer]:
+              - generic [ref=e74]: 친구
+              - generic [ref=e75]: "1"
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - generic [ref=e78]:
+              - heading "기록 내역" [level=2] [ref=e79]
+              - paragraph [ref=e80]: 이름과 금액을 빠르게 훑어볼 수 있도록 최신순과 금액순을 전환할 수 있습니다.
+            - generic [ref=e81]:
+              - button "최신순" [ref=e82] [cursor=pointer]
+              - button "금액순" [ref=e83] [cursor=pointer]
+          - list [ref=e84]:
+            - listitem [ref=e85]:
+              - generic [ref=e86]:
+                - generic [ref=e87]:
+                  - generic [ref=e88]:
+                    - paragraph [ref=e89]: 홍길동
+                    - generic [ref=e90]: 친구
+                  - paragraph [ref=e92]: A
+                  - paragraph [ref=e93]: 12분 전
+                - generic [ref=e94]:
+                  - paragraph [ref=e96]: 10만 원
+                  - button "홍길동 기록 삭제" [ref=e97] [cursor=pointer]
+            - listitem [ref=e101]:
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - generic [ref=e104]:
+                    - paragraph [ref=e105]: 김영희
+                    - generic [ref=e106]: 가족
+                  - paragraph [ref=e108]: B
+                  - paragraph [ref=e109]: 12분 전
+                - generic [ref=e110]:
+                  - paragraph [ref=e112]: 5만 원
+                  - button "김영희 기록 삭제" [ref=e113] [cursor=pointer]
+    - button "기록 추가" [ref=e117] [cursor=pointer]
+  - alert [ref=e118]

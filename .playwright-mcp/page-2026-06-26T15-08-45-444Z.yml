@@ -1,0 +1,115 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - img [ref=e8]
+            - text: Ceremony notebook
+          - heading "민지 결혼식" [level=1] [ref=e11]
+          - paragraph [ref=e12]:
+            - generic [ref=e13]: 축하금 장부
+            - generic [ref=e15]: 신부 측 접수대
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - img [ref=e18]
+            - generic [ref=e20]: 2026.06.26 예식
+          - generic [ref=e21]: 전체 1건
+    - main [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]:
+                - paragraph [ref=e30]: 전체 합계
+                - heading "10만 원" [level=2] [ref=e31]
+              - img [ref=e33]
+            - generic [ref=e35]:
+              - generic [ref=e36]:
+                - img [ref=e37]
+                - text: 1명 기록
+              - generic [ref=e42]: 합계는 저장된 전체 항목 기준으로 즉시 계산됩니다.
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - paragraph [ref=e45]: 평균 금액
+              - paragraph [ref=e46]: 10만 원
+              - paragraph [ref=e47]: 기록 1건당 평균
+            - generic [ref=e48]:
+              - paragraph [ref=e49]: 그룹 수
+              - paragraph [ref=e50]: 1개
+              - paragraph [ref=e51]: 1건 표시 중
+        - generic [ref=e52]:
+          - generic [ref=e54]:
+            - heading "그룹 필터" [level=2] [ref=e55]
+            - paragraph [ref=e56]: 차분한 회색 계열 점으로 그룹을 구분하고, 선택 상태만 초록색으로 강조합니다.
+          - generic [ref=e57]:
+            - button "전체 1" [pressed] [ref=e58] [cursor=pointer]:
+              - generic [ref=e59]: 전체
+              - generic [ref=e60]: "1"
+            - button "카카오 1" [ref=e61] [cursor=pointer]:
+              - generic [ref=e63]: 카카오
+              - generic [ref=e64]: "1"
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - generic [ref=e67]:
+              - heading "기록 내역" [level=2] [ref=e68]
+              - paragraph [ref=e69]: 이름과 금액을 빠르게 훑어볼 수 있도록 최신순과 금액순을 전환할 수 있습니다.
+            - generic [ref=e70]:
+              - button "최신순" [ref=e71] [cursor=pointer]
+              - button "금액순" [ref=e72] [cursor=pointer]
+          - list [ref=e73]:
+            - listitem [ref=e74]:
+              - generic [ref=e75]:
+                - generic [ref=e76]:
+                  - generic [ref=e77]:
+                    - paragraph [ref=e78]: 김민지
+                    - generic [ref=e79]: 카카오
+                  - paragraph [ref=e81]: 신부 친구
+                  - paragraph [ref=e82]: 1분 전
+                - generic [ref=e83]:
+                  - paragraph [ref=e85]: 10만 원
+                  - button "김민지 기록 삭제" [ref=e86] [cursor=pointer]:
+                    - img [ref=e87]
+    - button "기록 추가" [active] [ref=e126] [cursor=pointer]
+    - dialog [ref=e136]:
+      - button "추가 시트 닫기" [ref=e137] [cursor=pointer]
+      - generic [ref=e138]:
+        - generic [ref=e140]:
+          - generic [ref=e141]:
+            - paragraph [ref=e142]: 빠른 추가
+            - paragraph [ref=e143]: 이름에서 메모까지 순서대로 입력하면 저장 후 바로 다시 시작합니다.
+          - button "시트 닫기" [ref=e144] [cursor=pointer]:
+            - img [ref=e145]
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - text: 이름
+            - 'textbox "예: 김민지" [ref=e150]'
+          - generic [ref=e151]:
+            - text: 그룹
+            - 'combobox "예: 친구, 직장, 가족" [ref=e152]'
+          - generic [ref=e153]:
+            - text: 금액
+            - 'textbox "예: 15만 / 150000 / 십오만" [ref=e154]'
+            - generic [ref=e155]:
+              - button "5만" [ref=e156] [cursor=pointer]
+              - button "10만" [ref=e157] [cursor=pointer]
+              - button "15만" [ref=e158] [cursor=pointer]
+              - button "20만" [ref=e159] [cursor=pointer]
+          - generic [ref=e160]:
+            - text: 메모
+            - 'textbox "예: 신부 친구, 봉투 전달" [ref=e161]'
+          - generic [ref=e163]:
+            - generic [ref=e164]:
+              - paragraph [ref=e165]: 음성 입력
+              - paragraph [ref=e166]: 이름 → 그룹 → 금액 순서로 비어 있는 칸부터 이어서 입력합니다.
+            - button "음성으로 이어서 입력" [ref=e167] [cursor=pointer]:
+              - img [ref=e168]
+              - text: 음성으로 이어서 입력
+          - generic [ref=e171]:
+            - button "초기화" [ref=e172] [cursor=pointer]:
+              - img [ref=e173]
+              - text: 초기화
+            - button "저장하고 다음 기록" [ref=e176] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e132] [cursor=pointer]:
+    - img [ref=e133]
+  - alert [ref=e125]

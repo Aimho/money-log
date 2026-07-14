@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f1ea;
+  --surface: #fbfaf7;
+  --surface-muted: #f1ede4;
+  --surface-strong: #e9e3d8;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --ink: #22211d;
+  --ink-soft: #635d53;
+  --ink-faint: #8a8378;
+  --border: rgba(34, 33, 29, 0.1);
+  --border-strong: rgba(34, 33, 29, 0.16);
+  --accent: #10b981;
+  --focus: rgba(16, 185, 129, 0.28);
+  --radius-soft: 12px;
+  --shadow-card: 0 1px 2px rgba(34, 33, 29, 0.05), 0 12px 32px rgba(34, 33, 29, 0.06);
+  --shadow-panel: 0 1px 2px rgba(34, 33, 29, 0.06), 0 22px 48px rgba(34, 33, 29, 0.08);
+  --group-tone-1: #5f5b54;
+  --group-tone-2: #6d675f;
+  --group-tone-3: #7c756d;
+  --group-tone-4: #7d776f;
+  --group-tone-5: #646f70;
+  --group-tone-6: #6f7166;
+  --group-tone-7: #7c7366;
+  --group-tone-8: #6b666f;
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--ink);
+  font-family: "Pretendard Variable", "Pretendard", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  border-color: var(--border);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 22%, white 78%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-soft);
+  box-shadow: var(--shadow-panel);
+}
+
+.focus-ring {
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.focus-ring:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 48%, white 52%);
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+.paper-rule {
+  background-image: linear-gradient(to bottom, rgba(138, 131, 120, 0.12) 1px, transparent 1px);
+  background-size: 100% 34px;
+}
+
+.soft-divider {
+  border-color: rgba(34, 33, 29, 0.08);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.sheet-safe-shell {
+  max-height: min(92svh, calc(100dvh - 0.75rem));
+}
+
+.sheet-scroll-region {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(1.5rem + var(--safe-area-bottom));
+}
+
+@media (max-width: 1023px) {
+  .mobile-fab-clearance {
+    padding-bottom: calc(6.75rem + var(--safe-area-bottom));
+  }
+
+  .mobile-fab-offset {
+    bottom: calc(1rem + var(--safe-area-bottom));
+  }
+
+  .mobile-toast-offset {
+    bottom: calc(5.75rem + var(--safe-area-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

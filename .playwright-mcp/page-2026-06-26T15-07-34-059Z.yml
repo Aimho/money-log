@@ -1,0 +1,95 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - img [ref=e8]
+            - text: Ceremony notebook
+          - heading "민지 결혼식" [level=1] [ref=e11]
+          - paragraph [ref=e12]:
+            - generic [ref=e13]: 축하금 장부
+            - generic [ref=e14]: ·
+            - generic [ref=e15]: 신부 측 접수대
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - img [ref=e18]
+            - generic [ref=e20]: 2026.06.26 예식
+          - generic [ref=e21]: 전체 0건
+    - main [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - generic [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]:
+                - paragraph [ref=e30]: 전체 합계
+                - heading "0원" [level=2] [ref=e31]
+              - img [ref=e33]
+            - generic [ref=e35]:
+              - generic [ref=e36]:
+                - img [ref=e37]
+                - text: 0명 기록
+              - generic [ref=e42]: 합계는 저장된 전체 항목 기준으로 즉시 계산됩니다.
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - paragraph [ref=e45]: 평균 금액
+              - paragraph [ref=e46]: 0원
+              - paragraph [ref=e47]: 기록 1건당 평균
+            - generic [ref=e48]:
+              - paragraph [ref=e49]: 그룹 수
+              - paragraph [ref=e50]: 0개
+              - paragraph [ref=e51]: 0건 표시 중
+        - generic [ref=e52]:
+          - generic [ref=e54]:
+            - heading "그룹 필터" [level=2] [ref=e55]
+            - paragraph [ref=e56]: 차분한 회색 계열 점으로 그룹을 구분하고, 선택 상태만 초록색으로 강조합니다.
+          - button "전체 0" [pressed] [ref=e58] [cursor=pointer]:
+            - generic [ref=e59]: 전체
+            - generic [ref=e60]: "0"
+        - generic [ref=e61]:
+          - paragraph [ref=e62]: 빈 상태
+          - heading "첫 축하금 기록을 남겨 보세요." [level=2] [ref=e63]
+          - paragraph [ref=e64]: 아직 기록된 항목이 없어요. 이름, 그룹, 금액만 입력해도 바로 장부가 채워집니다.
+          - button "첫 기록 추가" [ref=e65] [cursor=pointer]
+      - complementary [ref=e67]:
+        - generic [ref=e68]:
+          - paragraph [ref=e69]: 기록 패널
+          - paragraph [ref=e70]: 데스크톱에서는 오른쪽 패널을 고정해 두고 목록을 훑으면서 빠르게 추가하도록 설계했습니다.
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - text: 이름
+            - textbox "이름" [ref=e74]:
+              - /placeholder: "예: 김민지"
+              - text: 김민지
+          - generic [ref=e75]:
+            - text: 그룹
+            - combobox "그룹" [ref=e76]
+          - generic [ref=e77]:
+            - text: 금액
+            - textbox "금액" [ref=e78]:
+              - /placeholder: "예: 15만 / 150000 / 십오만"
+            - generic [ref=e79]:
+              - button "5만" [ref=e80] [cursor=pointer]
+              - button "10만" [ref=e81] [cursor=pointer]
+              - button "15만" [ref=e82] [cursor=pointer]
+              - button "20만" [ref=e83] [cursor=pointer]
+          - generic [ref=e84]:
+            - text: 메모
+            - textbox "메모" [ref=e85]:
+              - /placeholder: "예: 신부 친구, 봉투 전달"
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - paragraph [ref=e89]: 음성 입력
+              - paragraph [ref=e90]: 이름 → 그룹 → 금액 순서로 비어 있는 칸부터 이어서 입력합니다.
+            - button "음성으로 이어서 입력" [active] [ref=e91] [cursor=pointer]:
+              - img [ref=e92]
+              - text: 음성으로 이어서 입력
+          - paragraph [ref=e102]: 그룹을 입력해 주세요.
+          - generic [ref=e95]:
+            - button "초기화" [ref=e96] [cursor=pointer]:
+              - img [ref=e97]
+              - text: 초기화
+            - button "저장하고 다음 기록" [ref=e100] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e108] [cursor=pointer]:
+    - img [ref=e109]
+  - alert [ref=e101]

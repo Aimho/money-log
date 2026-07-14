@@ -1,0 +1,53 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - banner [ref=f1e3]:
+      - generic [ref=f1e5]:
+        - generic [ref=f1e6]:
+          - generic [ref=f1e7]: Ceremony notebook
+          - heading "행사 이름을 입력해 주세요" [level=1] [ref=f1e11]
+          - paragraph [ref=f1e12]: 아직 행사 정보가 비어 있어요. 이름과 날짜를 저장하면 장부를 구분하기 쉬워집니다.
+        - generic [ref=f1e13]:
+          - generic [ref=f1e14]: 날짜 미설정
+          - generic [ref=f1e18]: 전체 0건
+          - button "행사 정보 입력" [ref=f1e19] [cursor=pointer]
+    - main [ref=f1e23]:
+      - generic [ref=f1e24]:
+        - generic [ref=f1e25]:
+          - generic [ref=f1e29]:
+            - generic [ref=f1e31]:
+              - generic [ref=f1e32]: 전체 장부
+              - generic [ref=f1e34]:
+                - paragraph [ref=f1e35]: 전체 합계
+                - heading "0원" [level=2] [ref=f1e150]
+            - generic [ref=f1e40]:
+              - generic [ref=f1e41]: 0명 기록
+              - generic [ref=f1e47]:
+                - paragraph [ref=f1e48]: 집계 메모
+                - paragraph [ref=f1e49]: 저장된 전체 항목을 한 장부 흐름으로 바로 합산해 보여줍니다.
+          - generic [ref=f1e50]:
+            - generic [ref=f1e51]:
+              - paragraph [ref=f1e52]: 평균 금액
+              - paragraph [ref=f1e53]: 0원
+              - paragraph [ref=f1e54]: 기록 1건당 평균
+            - generic [ref=f1e55]:
+              - paragraph [ref=f1e56]: 그룹 수
+              - paragraph [ref=f1e57]: 0개
+              - paragraph [ref=f1e58]: 0건 표시 중
+        - generic [ref=f1e59]:
+          - generic [ref=f1e61]:
+            - heading "그룹 필터" [level=2] [ref=f1e62]
+            - paragraph [ref=f1e63]: 차분한 회색 계열 점으로 그룹을 구분하고, 선택 상태만 초록색으로 강조합니다.
+          - button "전체 0" [pressed] [ref=f1e151] [cursor=pointer]:
+            - generic [ref=f1e66]: 전체
+            - generic [ref=f1e67]: "0"
+        - generic [ref=f1e152]:
+          - paragraph [ref=f1e153]: 빈 상태
+          - heading "첫 축하금 기록을 남겨 보세요." [level=2] [ref=f1e154]
+          - paragraph [ref=f1e155]: 아직 기록된 항목이 없어요. 이름, 그룹, 금액만 입력해도 바로 장부가 채워집니다.
+          - button "첫 기록 추가" [ref=f1e156] [cursor=pointer]
+    - generic [ref=f1e157]:
+      - generic [ref=f1e158]:
+        - paragraph [ref=f1e159]: 홍길동 기록을 숨겼어요.
+        - paragraph [ref=f1e160]: 3.5초 안에 취소하지 않으면 완전히 삭제됩니다.
+      - button "실행 취소" [ref=f1e161] [cursor=pointer]
+  - alert [ref=f1e73]
