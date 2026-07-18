@@ -1,5 +1,15 @@
 import { DEFAULT_EVENT_META, STORAGE_KEY } from "@/lib/constants";
 import type { EventMeta, GiftEntry, PersistedLedgerState } from "@/lib/types";
+import { EMPTY_OUTBOX, type LedgerOutbox } from "@/lib/sync-state";
+
+const IMPORT_MARKER_PREFIX = "gift-ledger-imported-v1:";
+const ACTIVE_LEDGER_PREFIX = "gift-ledger-active-v1:";
+
+function storageKeyForLedger(userId: string, ledgerId: string) {
+  return `${STORAGE_KEY}:user:${userId}:ledger:${ledgerId}`;
+}
+
+function outboxKey(userId: string, ledgerId: string) { return `${STORAGE_KEY}:outbox:${userId}:${ledgerId}`; }
 
 function isEntry(value: unknown): value is GiftEntry {
   if (!value || typeof value !== "object") {
@@ -61,6 +71,10 @@ function hasStorage() {
 }
 
 export function loadPersistedLedger(): PersistedLedgerState {
+  return loadLedgerAtKey(STORAGE_KEY);
+}
+
+function loadLedgerAtKey(storageKey: string): PersistedLedgerState {
   if (!hasStorage()) {
     return {
       entries: [],
@@ -69,7 +83,7 @@ export function loadPersistedLedger(): PersistedLedgerState {
     };
   }
 
-  const rawValue = window.localStorage.getItem(STORAGE_KEY);
+  const rawValue = window.localStorage.getItem(storageKey);
 
   if (!rawValue) {
     return {
@@ -92,10 +106,71 @@ export function loadPersistedLedger(): PersistedLedgerState {
   };
 }
 
+export function loadUserLedger(userId: string, ledgerId: string) {
+  return loadLedgerAtKey(storageKeyForLedger(userId, ledgerId));
+}
+
 export function savePersistedLedger(state: PersistedLedgerState) {
   if (!hasStorage()) {
     return;
   }
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+export function saveUserLedger(userId: string, ledgerId: string, state: PersistedLedgerState) {
+  if (!hasStorage()) return;
+  window.localStorage.setItem(storageKeyForLedger(userId, ledgerId), JSON.stringify(state));
+}
+
+export function clearUserLedger(userId: string, ledgerId: string) {
+  if (!hasStorage()) return;
+  window.localStorage.removeItem(storageKeyForLedger(userId, ledgerId));
+}
+
+export function loadLedgerOutbox(userId: string, ledgerId: string): LedgerOutbox {
+  if (!hasStorage()) return EMPTY_OUTBOX;
+  const raw = window.localStorage.getItem(outboxKey(userId, ledgerId));
+  if (!raw) return EMPTY_OUTBOX;
+  try { return { ...EMPTY_OUTBOX, ...(JSON.parse(raw) as LedgerOutbox) }; } catch { return EMPTY_OUTBOX; }
+}
+
+export function saveLedgerOutbox(userId: string, ledgerId: string, outbox: LedgerOutbox) {
+  if (!hasStorage()) return;
+  window.localStorage.setItem(outboxKey(userId, ledgerId), JSON.stringify(outbox));
+}
+
+export function hasCompletedLocalImport(userId: string) {
+  return hasStorage() && window.localStorage.getItem(`${IMPORT_MARKER_PREFIX}${userId}`) === "true";
+}
+
+export function markLocalImportComplete(userId: string) {
+  if (!hasStorage()) return;
+  window.localStorage.setItem(`${IMPORT_MARKER_PREFIX}${userId}`, "true");
+}
+
+export function getActiveLedgerId(userId: string) {
+  return hasStorage() ? window.localStorage.getItem(`${ACTIVE_LEDGER_PREFIX}${userId}`) : null;
+}
+
+export function setActiveLedgerId(userId: string, ledgerId: string) {
+  if (!hasStorage()) return;
+  window.localStorage.setItem(`${ACTIVE_LEDGER_PREFIX}${userId}`, ledgerId);
+}
+
+export function clearLocalLedgerState(userId: string, ledgerId: string) {
+  if (!hasStorage()) return;
+  window.localStorage.removeItem(storageKeyForLedger(userId, ledgerId));
+  window.localStorage.removeItem(outboxKey(userId, ledgerId));
+  if (getActiveLedgerId(userId) === ledgerId) {
+    window.localStorage.removeItem(`${ACTIVE_LEDGER_PREFIX}${userId}`);
+  }
+}
+
+export function clearPersistedLedger() {
+  if (!hasStorage()) {
+    return;
+  }
+
+  window.localStorage.removeItem(STORAGE_KEY);
 }

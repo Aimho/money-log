@@ -57,8 +57,7 @@ export function AddEntrySheet({ children, isOpen, onCloseAction }: AddEntrySheet
               <div className="mx-auto mb-4 h-1.5 w-12 rounded-[var(--radius-soft)] bg-[rgba(34,33,29,0.14)]" />
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-[var(--ink)]">빠른 추가</p>
-                  <p className="mt-1 text-sm text-[var(--ink-soft)]">이름에서 메모까지 순서대로 입력하면 저장 후 바로 다시 시작합니다.</p>
+                  <p className="text-base font-semibold tracking-[-0.02em] text-[var(--ink)]">기록 추가</p>
                 </div>
                 <button
                   aria-label="시트 닫기"

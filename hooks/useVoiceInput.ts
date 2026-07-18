@@ -16,15 +16,17 @@ type VoiceValues = {
 
 type UseVoiceInputOptions = {
   onCaptured: (step: VoiceStep, transcript: string) => void;
+  onFullTranscript?: (transcript: string) => void;
   onStepResolved: (nextStep: VoiceStep | null) => void;
   values: VoiceValues;
 };
 
-export function useVoiceInput({ onCaptured, onStepResolved, values }: UseVoiceInputOptions) {
+export function useVoiceInput({ onCaptured, onFullTranscript, onStepResolved, values }: UseVoiceInputOptions) {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const draftRef = useRef<VoiceValues>(values);
   const activeStepRef = useRef<VoiceStep | null>(null);
   const restartRef = useRef(false);
+  const isFullCaptureRef = useRef(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [activeStep, setActiveStep] = useState<VoiceStep | null>(null);
@@ -100,7 +102,8 @@ export function useVoiceInput({ onCaptured, onStepResolved, values }: UseVoiceIn
 
   const stop = () => {
     restartRef.current = false;
-    recognitionRef.current?.stop();
+    isFullCaptureRef.current = false;
+    recognitionRef.current?.abort();
     setIsListening(false);
     setActiveStep(null);
     activeStepRef.current = null;
@@ -139,6 +142,15 @@ export function useVoiceInput({ onCaptured, onStepResolved, values }: UseVoiceIn
         .map((result) => result[0]?.transcript ?? "")
         .join(" ")
         .trim();
+
+      if (isFullCaptureRef.current && transcript) {
+        isFullCaptureRef.current = false;
+        restartRef.current = false;
+        onFullTranscript?.(transcript);
+        activeStepRef.current = null;
+        setActiveStep(null);
+        return;
+      }
 
       if (!activeStepRef.current || !transcript) {
         return;
@@ -188,6 +200,7 @@ export function useVoiceInput({ onCaptured, onStepResolved, values }: UseVoiceIn
   };
 
   const start = (preferredStep?: VoiceStep) => {
+    isFullCaptureRef.current = false;
     const nextStep = getStartStep(draftRef.current, preferredStep);
 
     if (!nextStep) {
@@ -197,6 +210,11 @@ export function useVoiceInput({ onCaptured, onStepResolved, values }: UseVoiceIn
     }
 
     beginListening(nextStep);
+  };
+
+  const startFull = () => {
+    isFullCaptureRef.current = true;
+    beginListening("name");
   };
 
   const statusText = useMemo(() => {
@@ -222,9 +240,11 @@ export function useVoiceInput({ onCaptured, onStepResolved, values }: UseVoiceIn
   }, [activeStep, errorText, isSupported]);
 
   return {
+    errorText,
     isListening,
     isSupported,
     start,
+    startFull,
     statusText,
     stop,
   };

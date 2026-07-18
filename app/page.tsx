@@ -1,5 +1,5 @@
-import { GiftLedgerApp } from "@/components/gift-ledger/GiftLedgerApp";
+import { SupabaseGate } from "@/components/auth/SupabaseGate";
 
 export default function HomePage() {
-  return <GiftLedgerApp />;
+  return <SupabaseGate />;
 }

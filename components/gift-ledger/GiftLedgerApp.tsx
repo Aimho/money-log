@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { AddEntrySheet } from "@/components/gift-ledger/AddEntrySheet";
 import { DesktopEntryPanel } from "@/components/gift-ledger/DesktopEntryPanel";
@@ -21,10 +21,11 @@ import { buildGroupSummaries, buildLedgerSummary, filterEntries, sortEntries } f
 import type { EntryInput, EventMeta, SortMode } from "@/lib/types";
 import { useGiftLedgerStore } from "@/store/useGiftLedgerStore";
 
-export function GiftLedgerApp() {
+export function GiftLedgerApp({ canEditEvent = true, cloudControls, cloudError }: { canEditEvent?: boolean; cloudControls?: ReactNode; cloudError?: string | null }) {
   const {
     entries,
     eventMeta,
+    hydrationError,
     isHydrated,
     pendingDeletion,
     selectedGroup,
@@ -32,18 +33,14 @@ export function GiftLedgerApp() {
     addEntry,
     clearStorageError,
     confirmPendingDeletion,
-    hydrate,
     requestDeleteEntry,
+    resetPersistedLedger,
     setSelectedGroup,
     undoPendingDeletion,
     updateEventMeta,
   } = useGiftLedgerStore();
   const [sortMode, setSortMode] = useState<SortMode>(DEFAULT_SORT_MODE);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
 
   useEffect(() => {
     if (!pendingDeletion) {
@@ -69,10 +66,7 @@ export function GiftLedgerApp() {
   const summary = useMemo(() => buildLedgerSummary(visibleEntries, filteredEntries), [filteredEntries, visibleEntries]);
   const groupSummaries = useMemo(() => buildGroupSummaries(visibleEntries), [visibleEntries]);
   const existingGroups = useMemo(
-    () =>
-      [...new Set(visibleEntries.map((entry) => normalizeStoredGroupName(entry.group)).filter(Boolean))].sort((left, right) =>
-        left.localeCompare(right, "ko"),
-      ),
+    () => [...new Set(visibleEntries.map((entry) => normalizeStoredGroupName(entry.group)).filter(Boolean))],
     [visibleEntries],
   );
   const shouldShowMobileFab = visibleEntries.length > 0;
@@ -90,25 +84,35 @@ export function GiftLedgerApp() {
     return <LedgerSkeleton />;
   }
 
-  if (storageError) {
-    return <LedgerErrorState message={storageError} onDismiss={clearStorageError} />;
+  if (hydrationError) {
+    return <LedgerErrorState message={hydrationError} onDismiss={resetPersistedLedger} />;
   }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--ink)]">
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--background)]">
         <div className="mx-auto max-w-[1180px] px-4 py-3 sm:px-6 lg:px-8">
-          <EventMetaBanner eventMeta={eventMeta} entryCount={visibleEntries.length} onSaveAction={handleSaveEventMeta} selectedGroup={selectedGroup} />
+          <EventMetaBanner canEdit={canEditEvent} eventMeta={eventMeta} entryCount={visibleEntries.length} onSaveAction={handleSaveEventMeta} selectedGroup={selectedGroup} />
+          {cloudControls}
         </div>
       </header>
+
+      {storageError || cloudError ? (
+        <div className="mx-auto max-w-[1180px] px-4 pt-3 sm:px-6 lg:px-8" role="status">
+          <div className="flex items-center justify-between gap-3 rounded-[var(--radius-soft)] bg-[var(--ink)] px-4 py-3 text-sm text-[var(--surface)] shadow-[var(--shadow-card)]">
+            <p>{storageError ?? cloudError} 이 탭에서는 변경 내용을 계속 확인할 수 있습니다.</p>
+            {storageError ? <button className="min-h-10 shrink-0 rounded-[var(--radius-soft)] px-3 font-semibold active:scale-95" onClick={clearStorageError} type="button">닫기</button> : null}
+          </div>
+        </div>
+      ) : null}
 
       <main className={`${shouldShowMobileFab ? "mobile-fab-clearance " : ""}mx-auto max-w-[1180px] px-4 pt-4 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_336px] lg:gap-8 lg:px-8 lg:pb-10`}>
         <div className="space-y-4 lg:space-y-5">
           <section className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]">
             <HeroCard label={selectedGroup ?? "전체"} totalAmount={summary.totalAmount} totalPeople={summary.totalPeople} />
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-              <KpiCard label="평균 금액" value={formatAmountCompact(summary.averageAmount)} sublabel="기록 1건당 평균" />
-              <KpiCard label="그룹 수" value={`${summary.groupCount}개`} sublabel={`${summary.filteredCount}건 표시 중`} />
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-1 lg:gap-4">
+              <KpiCard label="평균 금액" value={formatAmountCompact(summary.averageAmount)} />
+              <KpiCard label="그룹 수" value={`${summary.groupCount}개`} />
             </div>
           </section>
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { Mic, MicOff, RotateCcw } from "lucide-react";
+import { Mic, RotateCcw } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { QUICK_AMOUNT_OPTIONS } from "@/lib/constants";
 import { formatAmountField, parseAmountInput } from "@/lib/amount";
 import type { EntryInput, GiftEntry, VoiceStep } from "@/lib/types";
+import { parseVoiceEntry, type VoiceEntryCandidate } from "@/lib/voice-entry";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 
 type EntryFormProps = {
@@ -31,6 +32,7 @@ const INITIAL_VALUES: FormValues = {
 export function EntryForm({ entries, existingGroups, onSubmitAction }: EntryFormProps) {
   const [values, setValues] = useState<FormValues>(INITIAL_VALUES);
   const [formError, setFormError] = useState<string | null>(null);
+  const [voiceCandidates, setVoiceCandidates] = useState<VoiceEntryCandidate[]>([]);
   const activeFieldRef = useRef<VoiceStep | "memo" | null>("name");
   const nameRef = useRef<HTMLInputElement>(null);
   const groupRef = useRef<HTMLInputElement>(null);
@@ -95,6 +97,23 @@ export function EntryForm({ entries, existingGroups, onSubmitAction }: EntryForm
         moveToField(nextStep ?? "memo");
       });
     },
+    onFullTranscript: (transcript) => {
+      const result = parseVoiceEntry(transcript, existingGroups);
+      const best = result.candidates[0];
+      if (!best) {
+        setFormError("이름과 금액을 구분하지 못했어요. 다시 말해 주세요.");
+        setVoiceCandidates([]);
+        return;
+      }
+      setFormError(null);
+      if (result.isAmbiguous) {
+        setVoiceCandidates(result.candidates);
+        return;
+      }
+      setValues((current) => ({ ...current, amountText: formatAmountField(best.amount), group: best.group, name: best.name }));
+      setVoiceCandidates([]);
+      requestAnimationFrame(() => memoRef.current?.focus());
+    },
     values: {
       amount: values.amountText,
       group: values.group,
@@ -111,6 +130,7 @@ export function EntryForm({ entries, existingGroups, onSubmitAction }: EntryForm
     voice.stop();
     setFormError(null);
     setValues(INITIAL_VALUES);
+    setVoiceCandidates([]);
     requestAnimationFrame(() => {
       activeFieldRef.current = "name";
       nameRef.current?.focus();
@@ -261,7 +281,7 @@ export function EntryForm({ entries, existingGroups, onSubmitAction }: EntryForm
           메모
         </label>
         <textarea
-          className="focus-ring min-h-[112px] w-full rounded-[var(--radius-soft)] border bg-white px-3 py-3 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink-faint)]"
+          className="focus-ring min-h-[88px] w-full rounded-[var(--radius-soft)] border bg-white px-3 py-3 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink-faint)]"
           id="entry-memo"
           onChange={(event) => updateField("memo", event.target.value)}
           onFocus={() => {
@@ -270,45 +290,61 @@ export function EntryForm({ entries, existingGroups, onSubmitAction }: EntryForm
           onKeyDown={handleEnterAdvance("memo")}
           placeholder="예: 신부 친구, 봉투 전달"
           ref={memoRef}
-          rows={4}
+          rows={3}
           value={values.memo}
         />
       </div>
 
-      <div className="rounded-[var(--radius-soft)] border border-[rgba(34,33,29,0.08)] bg-[rgba(255,255,255,0.52)] p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-[var(--ink)]">음성 입력</p>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              {voice.isSupported
-                ? voice.statusText
-                : "이 브라우저는 음성 입력을 지원하지 않아 수동 입력만 사용할 수 있어요."}
+      {voice.isSupported ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {voice.isListening || voice.errorText ? (
+            <p aria-live="polite" className="min-w-0 truncate text-sm text-[var(--ink-soft)]">
+              {voice.isListening ? "이름, 그룹, 금액을 한 문장으로 말해 주세요." : voice.statusText}
             </p>
-          </div>
+          ) : null}
           <button
-            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-soft)] px-4 text-sm active:scale-95 ${
-              voice.isSupported
-                ? voice.isListening
-                  ? "bg-[var(--accent)] font-semibold text-white"
-                  : "border border-[var(--border)] bg-[var(--surface)] font-medium text-[var(--ink-soft)]"
-                : "border border-[var(--border)] bg-[rgba(255,255,255,0.6)] font-medium text-[var(--ink-faint)]"
+            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-soft)] px-3 text-sm font-semibold active:scale-95 ${
+              voice.isListening ? "bg-[var(--accent)] text-white" : "bg-[var(--ink)] text-[var(--surface)]"
             }`}
-            disabled={!voice.isSupported}
             onClick={() => {
               if (voice.isListening) {
                 voice.stop();
                 return;
               }
-
-              voice.start(activeFieldRef.current && activeFieldRef.current !== "memo" ? activeFieldRef.current : undefined);
+              setVoiceCandidates([]);
+              setFormError(null);
+              voice.startFull();
             }}
             type="button"
           >
-            {voice.isSupported ? (voice.isListening ? <Mic className="h-4 w-4" /> : <Mic className="h-4 w-4" />) : <MicOff className="h-4 w-4" />}
-            {voice.isListening ? "듣는 중" : "음성으로 이어서 입력"}
+            <Mic className="h-4 w-4" />
+            {voice.isListening ? "듣기 취소" : "음성 입력"}
           </button>
         </div>
-      </div>
+      ) : null}
+
+      {voiceCandidates.length > 0 ? (
+        <fieldset className="rounded-[var(--radius-soft)] bg-[var(--surface-muted)] p-3">
+          <legend className="px-1 text-sm font-semibold text-[var(--ink)]">말씀하신 내용이 맞나요?</legend>
+          <div className="mt-2 grid gap-2">
+            {voiceCandidates.map((candidate) => (
+              <button
+                className="min-h-11 rounded-[var(--radius-soft)] bg-[var(--surface)] px-3 py-2 text-left text-sm text-[var(--ink)] shadow-[var(--shadow-card)] active:scale-[0.98]"
+                key={`${candidate.name}-${candidate.group}`}
+                onClick={() => {
+                  setValues((current) => ({ ...current, amountText: formatAmountField(candidate.amount), group: candidate.group, name: candidate.name }));
+                  setVoiceCandidates([]);
+                  requestAnimationFrame(() => memoRef.current?.focus());
+                }}
+                type="button"
+              >
+                <span className="font-semibold">{candidate.name}</span>
+                <span className="ml-2 text-[var(--ink-soft)]">{candidate.group || "미분류"} · {formatAmountField(candidate.amount)}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
 
       {formError ? <p className="text-sm font-medium text-[var(--ink)]">{formError}</p> : null}
 

@@ -1,15 +1,13 @@
 type KpiCardProps = {
   label: string;
-  sublabel: string;
   value: string;
 };
 
-export function KpiCard({ label, sublabel, value }: KpiCardProps) {
+export function KpiCard({ label, value }: KpiCardProps) {
   return (
-    <section className="surface-card px-5 py-4 sm:px-6">
-      <p className="text-sm font-medium text-[var(--ink-faint)]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">{value}</p>
-      <p className="mt-2 text-sm text-[var(--ink-soft)]">{sublabel}</p>
+    <section className="surface-card flex min-h-[92px] items-center justify-between gap-2 px-4 py-4 sm:gap-4 sm:px-6">
+      <p className="whitespace-nowrap text-xs font-medium text-[var(--ink-faint)] sm:text-sm">{label}</p>
+      <p className="whitespace-nowrap tabular-nums text-xl font-semibold tracking-[-0.04em] text-[var(--ink)] sm:text-2xl">{value}</p>
     </section>
   );
 }

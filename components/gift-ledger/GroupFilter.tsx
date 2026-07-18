@@ -16,14 +16,9 @@ export function GroupFilter({ groups, onSelectAction, selectedGroup }: GroupFilt
 
   return (
     <section className="surface-card px-4 py-4 sm:px-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--ink)]">그룹 필터</h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">차분한 회색 계열 점으로 그룹을 구분하고, 선택 상태만 초록색으로 강조합니다.</p>
-        </div>
-      </div>
+      <h2 className="text-sm font-semibold text-[var(--ink)]">그룹</h2>
 
-      <div className="scrollbar-hide mt-4 flex gap-2 overflow-x-auto pb-1">
+      <div className="scrollbar-hide mt-3 flex gap-2 overflow-x-auto pb-1">
         <FilterChip
           count={groups.reduce((sum, group) => sum + group.count, 0)}
           isSelected={selectedGroup === null}

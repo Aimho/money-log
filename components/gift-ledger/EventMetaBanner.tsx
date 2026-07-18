@@ -6,13 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { EventMeta } from "@/lib/types";
 
 type EventMetaBannerProps = {
+  canEdit?: boolean;
   eventMeta: EventMeta;
   entryCount: number;
   onSaveAction: (eventMeta: EventMeta) => void;
   selectedGroup: string | null;
 };
 
-export function EventMetaBanner({ entryCount, eventMeta, onSaveAction, selectedGroup }: EventMetaBannerProps) {
+export function EventMetaBanner({ canEdit = true, entryCount, eventMeta, onSaveAction, selectedGroup }: EventMetaBannerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<EventMeta>(eventMeta);
   const hasMeta = useMemo(() => Boolean(eventMeta.name.trim() || eventMeta.date.trim()), [eventMeta.date, eventMeta.name]);
@@ -42,11 +43,11 @@ export function EventMetaBanner({ entryCount, eventMeta, onSaveAction, selectedG
   };
 
   return (
-    <div className="surface-card flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-faint)]">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
           <NotebookPen className="h-3.5 w-3.5" />
-          Ceremony notebook
+          축하금 장부
         </div>
 
         {isEditing ? (
@@ -97,12 +98,9 @@ export function EventMetaBanner({ entryCount, eventMeta, onSaveAction, selectedG
           </form>
         ) : (
           <>
-            <h1 className={`mt-1 truncate text-lg font-semibold tracking-[-0.03em] sm:text-xl ${hasMeta ? "text-[var(--ink)]" : "text-[var(--ink-soft)]"}`}>
-              {eventMeta.name || "행사 이름을 입력해 주세요"}
+            <h1 className={`mt-0.5 truncate text-lg font-semibold tracking-[-0.03em] sm:text-xl ${hasMeta ? "text-[var(--ink)]" : "text-[var(--ink-soft)]"}`}>
+              {eventMeta.name || "행사 이름"}
             </h1>
-            <p className="mt-1 text-sm text-[var(--ink-soft)]">
-              {hasMeta ? "행사 정보는 이 브라우저에 저장되어 다음 방문 때도 이어집니다." : "아직 행사 정보가 비어 있어요. 이름과 날짜를 저장하면 장부를 구분하기 쉬워집니다."}
-            </p>
           </>
         )}
       </div>
@@ -112,17 +110,15 @@ export function EventMetaBanner({ entryCount, eventMeta, onSaveAction, selectedG
           <CalendarDays className="h-4 w-4 text-[var(--ink-faint)]" />
           <span>{eventMeta.date || "날짜 미설정"}</span>
         </div>
-        <div className="inline-flex min-h-11 items-center rounded-[var(--radius-soft)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 text-[var(--ink)]">
-          {selectedGroup ? `${selectedGroup} · ${entryCount}건` : `전체 ${entryCount}건`}
-        </div>
-        {!isEditing ? (
+        <span className="font-medium tabular-nums text-[var(--ink)]">{selectedGroup ? `${selectedGroup} · ${entryCount}건` : `${entryCount}건`}</span>
+        {!isEditing && canEdit ? (
           <button
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-soft)] border border-[var(--border)] bg-[var(--surface-muted)] px-3 text-[var(--ink)] active:scale-95"
             onClick={startEditing}
             type="button"
           >
             <PencilLine className="h-4 w-4 text-[var(--ink-faint)]" />
-            {hasMeta ? "수정" : "행사 정보 입력"}
+            {hasMeta ? "수정" : "정보 입력"}
           </button>
         ) : null}
       </div>

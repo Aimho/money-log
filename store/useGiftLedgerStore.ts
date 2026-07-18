@@ -3,8 +3,9 @@
 import { create } from "zustand";
 
 import { DEFAULT_EVENT_META } from "@/lib/constants";
-import { savePersistedLedger, loadPersistedLedger } from "@/lib/storage";
-import type { EntryInput, EventMeta, GiftEntry, PendingDeletion } from "@/lib/types";
+import { requestCloudSync } from "@/lib/cloud-sync";
+import { clearPersistedLedger, clearUserLedger, loadPersistedLedger, loadUserLedger, savePersistedLedger, saveUserLedger } from "@/lib/storage";
+import type { EntryInput, EventMeta, GiftEntry, PendingDeletion, PersistedLedgerState } from "@/lib/types";
 import { createEntryId } from "@/lib/utils";
 
 type GiftLedgerState = {
@@ -14,9 +15,14 @@ type GiftLedgerState = {
   entries: GiftEntry[];
   eventMeta: EventMeta;
   hydrate: () => void;
+  hydrateForUser: (userId: string) => void;
+  hydrateForLedger: (userId: string, ledgerId: string) => void;
+  hydrationError: string | null;
   isHydrated: boolean;
   pendingDeletion: PendingDeletion | null;
   requestDeleteEntry: (entryId: string) => void;
+  resetPersistedLedger: () => void;
+  replaceLedger: (state: PersistedLedgerState) => void;
   selectedGroup: string | null;
   setSelectedGroup: (group: string | null) => void;
   storageError: string | null;
@@ -24,8 +30,17 @@ type GiftLedgerState = {
   updateEventMeta: (eventMeta: EventMeta) => void;
 };
 
-function persistState(entries: GiftEntry[], selectedGroup: string | null, eventMeta: EventMeta) {
-  savePersistedLedger({ entries, eventMeta, selectedGroup });
+let activeUserId: string | null = null;
+let activeLedgerId: string | null = null;
+
+function persistState(entries: GiftEntry[], selectedGroup: string | null, eventMeta: EventMeta, changes?: { deletedEntryIds?: string[]; importPending?: boolean; importRevision?: string; metadataPending?: boolean; upsertEntryIds?: string[] }) {
+  const state = { entries, eventMeta, selectedGroup };
+  if (activeUserId && activeLedgerId) {
+    saveUserLedger(activeUserId, activeLedgerId, state);
+    requestCloudSync(state, changes);
+  } else {
+    savePersistedLedger(state);
+  }
 }
 
 export const useGiftLedgerStore = create<GiftLedgerState>((set, get) => ({
@@ -38,14 +53,14 @@ export const useGiftLedgerStore = create<GiftLedgerState>((set, get) => ({
     const nextEntries = [entry, ...get().entries];
 
     try {
-      persistState(nextEntries, get().selectedGroup, get().eventMeta);
+      persistState(nextEntries, get().selectedGroup, get().eventMeta, { upsertEntryIds: [entry.id] });
       set({ entries: nextEntries, storageError: null });
     } catch {
       set({ entries: nextEntries, storageError: "브라우저에 장부를 저장하지 못했습니다." });
     }
   },
   clearStorageError: () => {
-    set({ entries: [], eventMeta: DEFAULT_EVENT_META, pendingDeletion: null, selectedGroup: null, storageError: null });
+    set({ storageError: null });
   },
   confirmPendingDeletion: () => {
     const pendingDeletion = get().pendingDeletion;
@@ -57,28 +72,55 @@ export const useGiftLedgerStore = create<GiftLedgerState>((set, get) => ({
     const nextEntries = get().entries.filter((entry) => entry.id !== pendingDeletion.entry.id);
 
     try {
-      persistState(nextEntries, get().selectedGroup, get().eventMeta);
+      persistState(nextEntries, get().selectedGroup, get().eventMeta, { deletedEntryIds: [pendingDeletion.entry.id] });
       set({ entries: nextEntries, pendingDeletion: null, storageError: null });
     } catch {
-      set({ pendingDeletion: null, storageError: "삭제 내용을 브라우저에 저장하지 못했습니다." });
+      set({ entries: nextEntries, pendingDeletion: null, storageError: "삭제 내용을 브라우저에 저장하지 못했습니다." });
     }
   },
   entries: [],
   eventMeta: DEFAULT_EVENT_META,
   hydrate: () => {
+    activeUserId = null;
+    activeLedgerId = null;
     try {
       const persisted = loadPersistedLedger();
       set({
         entries: persisted.entries,
         eventMeta: persisted.eventMeta,
+        hydrationError: null,
         isHydrated: true,
         selectedGroup: persisted.selectedGroup,
         storageError: null,
       });
     } catch {
-      set({ isHydrated: true, storageError: "저장된 장부를 읽지 못해 기본 상태로 돌아가야 합니다." });
+      set({ hydrationError: "저장된 장부 데이터가 손상되어 읽을 수 없습니다.", isHydrated: true });
     }
   },
+  hydrateForUser: (userId) => {
+    activeUserId = userId;
+    activeLedgerId = null;
+    set({ entries: [], eventMeta: DEFAULT_EVENT_META, hydrationError: null, isHydrated: true, pendingDeletion: null, selectedGroup: null, storageError: null });
+  },
+  hydrateForLedger: (userId, ledgerId) => {
+    activeUserId = userId;
+    activeLedgerId = ledgerId;
+    try {
+      const persisted = loadUserLedger(userId, ledgerId);
+      set({
+        entries: persisted.entries,
+        eventMeta: persisted.eventMeta,
+        hydrationError: null,
+        isHydrated: true,
+        pendingDeletion: null,
+        selectedGroup: persisted.selectedGroup,
+        storageError: null,
+      });
+    } catch {
+      set({ hydrationError: "이 계정의 기기 캐시를 읽을 수 없습니다.", isHydrated: true });
+    }
+  },
+  hydrationError: null,
   isHydrated: false,
   pendingDeletion: null,
   requestDeleteEntry: (entryId) => {
@@ -93,6 +135,30 @@ export const useGiftLedgerStore = create<GiftLedgerState>((set, get) => ({
     }
 
     set({ pendingDeletion: { deadline: Date.now() + 3500, entry } });
+  },
+  resetPersistedLedger: () => {
+    try {
+      if (activeUserId && activeLedgerId) clearUserLedger(activeUserId, activeLedgerId);
+      else clearPersistedLedger();
+      set({
+        entries: [],
+        eventMeta: DEFAULT_EVENT_META,
+        hydrationError: null,
+        pendingDeletion: null,
+        selectedGroup: null,
+        storageError: null,
+      });
+    } catch {
+      set({ hydrationError: "손상된 장부 데이터를 초기화하지 못했습니다." });
+    }
+  },
+  replaceLedger: (state) => {
+    try {
+      persistState(state.entries, state.selectedGroup, state.eventMeta);
+      set({ ...state, hydrationError: null, isHydrated: true, pendingDeletion: null, storageError: null });
+    } catch {
+      set({ ...state, hydrationError: null, isHydrated: true, pendingDeletion: null, storageError: "장부를 기기에 저장하지 못했습니다." });
+    }
   },
   selectedGroup: null,
   setSelectedGroup: (group) => {
@@ -109,10 +175,10 @@ export const useGiftLedgerStore = create<GiftLedgerState>((set, get) => ({
   },
   updateEventMeta: (eventMeta) => {
     try {
-      persistState(get().entries, get().selectedGroup, eventMeta);
+      persistState(get().entries, get().selectedGroup, eventMeta, { metadataPending: true });
       set({ eventMeta, storageError: null });
     } catch {
-      set({ storageError: "행사 정보를 브라우저에 저장하지 못했습니다." });
+      set({ eventMeta, storageError: "행사 정보를 브라우저에 저장하지 못했습니다." });
     }
   },
 }));

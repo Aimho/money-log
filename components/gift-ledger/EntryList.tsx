@@ -14,10 +14,7 @@ export function EntryList({ entries, hasPendingDeletion, onDelete, onSortChange,
   return (
     <section className="surface-card overflow-hidden">
       <div className="flex flex-col gap-3 border-b border-[var(--border)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--ink)]">기록 내역</h2>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">이름과 금액을 빠르게 훑어볼 수 있도록 최신순과 금액순을 전환할 수 있습니다.</p>
-        </div>
+        <h2 className="text-sm font-semibold text-[var(--ink)]">기록 <span className="ml-1 font-medium tabular-nums text-[var(--ink-faint)]">{entries.length}</span></h2>
         <div className="inline-flex rounded-[var(--radius-soft)] border border-[var(--border)] bg-[var(--surface-muted)] p-1">
           {([
             ["latest", "최신순"],
