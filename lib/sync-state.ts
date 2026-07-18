@@ -10,6 +10,10 @@ export type LedgerOutbox = {
 
 export const EMPTY_OUTBOX: LedgerOutbox = { deletedEntryIds: [], importPending: false, importRevision: null, metadataPending: false, upsertEntries: [] };
 
+export function hasOutboxChanges(outbox: LedgerOutbox) {
+  return Boolean(outbox.deletedEntryIds.length || outbox.upsertEntries.length || outbox.importPending || outbox.metadataPending);
+}
+
 export function mergeOutbox(current: LedgerOutbox, state: PersistedLedgerState, changes: { deletedEntryIds?: string[]; importPending?: boolean; importRevision?: string; metadataPending?: boolean; upsertEntryIds?: string[] }): LedgerOutbox {
   const deleted = new Set([...current.deletedEntryIds, ...(changes.deletedEntryIds ?? [])]);
   const upserts = new Map(current.upsertEntries.map((entry) => [entry.id, entry]));

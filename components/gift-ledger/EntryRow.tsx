@@ -10,12 +10,13 @@ import { getGroupTone } from "@/lib/group-palette";
 import type { GiftEntry } from "@/lib/types";
 
 type EntryRowProps = {
+  canDelete: boolean;
   entry: GiftEntry;
   isDeleteDisabled: boolean;
   onDeleteAction: () => void;
 };
 
-export function EntryRow({ entry, isDeleteDisabled, onDeleteAction }: EntryRowProps) {
+export function EntryRow({ canDelete, entry, isDeleteDisabled, onDeleteAction }: EntryRowProps) {
   const prefersReducedMotion = useReducedMotion();
   const groupLabel = getGroupDisplayName(entry.group);
 
@@ -43,7 +44,7 @@ export function EntryRow({ entry, isDeleteDisabled, onDeleteAction }: EntryRowPr
           <div className="text-right">
             <p className="text-lg font-semibold tracking-[-0.03em] text-[var(--ink)]">{formatAmountCompact(entry.amount)}</p>
           </div>
-          <button
+          {canDelete ? <button
             aria-label={`${entry.name} 기록 삭제`}
             className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-soft)] border border-[var(--border)] bg-[var(--surface-muted)] active:scale-95 ${
               isDeleteDisabled ? "cursor-not-allowed text-[var(--ink-faint)] opacity-55" : "text-[var(--ink-soft)]"
@@ -53,7 +54,7 @@ export function EntryRow({ entry, isDeleteDisabled, onDeleteAction }: EntryRowPr
             type="button"
           >
             <Trash2 className="h-4 w-4" />
-          </button>
+          </button> : null}
         </div>
       </div>
     </motion.li>

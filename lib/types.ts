@@ -16,6 +16,7 @@ export type EventMeta = {
 
 export type GiftEntry = EntryInput & {
   createdAt: string;
+  createdBy?: string;
   id: string;
 };
 

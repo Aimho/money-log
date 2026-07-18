@@ -11,6 +11,7 @@ type LedgerRow = {
 type EntryRow = {
   amount: number;
   created_at: string;
+  created_by: string;
   group_name: string;
   id: string;
   memo: string;
@@ -22,6 +23,10 @@ export type LedgerListItem = { id: string; isOwner: boolean; name: string; role:
 
 export function canConfirmLedgerDeletion(confirmation: string, ledgerName: string) {
   return confirmation === ledgerName;
+}
+
+export function canDeleteCloudEntry(entry: GiftEntry, userId: string | undefined, isOwner: boolean) {
+  return isOwner || Boolean(userId && entry.createdBy === userId);
 }
 
 export async function listCloudLedgers(client: SupabaseBrowserClient): Promise<LedgerListItem[]> {
@@ -52,6 +57,7 @@ export function rowToEntry(row: EntryRow): GiftEntry {
   return {
     amount: Number(row.amount),
     createdAt: row.created_at,
+    createdBy: row.created_by,
     group: row.group_name,
     id: row.id,
     memo: row.memo,
@@ -95,7 +101,7 @@ export async function fetchCloudLedger(client: SupabaseBrowserClient, requestedL
 
   const { data: entries, error: entriesError } = await client
     .from("entries")
-    .select("id,name,group_name,amount,memo,created_at")
+    .select("id,name,group_name,amount,memo,created_at,created_by")
     .eq("ledger_id", ledger.id)
     .order("created_at", { ascending: false })
     .returns<EntryRow[]>();
@@ -121,6 +127,12 @@ export async function acceptLedgerInvite(client: SupabaseBrowserClient, token: s
   const { data, error } = await client.rpc("accept_ledger_invite", { raw_token: token });
   if (error) throw error;
   return data as string;
+}
+
+export function isInvalidInviteError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  return candidate.code === "P0001" && candidate.message === "Invite is invalid or expired";
 }
 
 export async function createCloudLedger(client: SupabaseBrowserClient, eventMeta: EventMeta) {

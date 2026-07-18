@@ -4,7 +4,7 @@ import { create } from "zustand";
 
 import { DEFAULT_EVENT_META } from "@/lib/constants";
 import { requestCloudSync } from "@/lib/cloud-sync";
-import { clearPersistedLedger, clearUserLedger, loadPersistedLedger, loadUserLedger, savePersistedLedger, saveUserLedger } from "@/lib/storage";
+import { clearPersistedLedger, clearUserLedger, loadPersistedLedger, loadUserLedger, savePersistedLedger, saveSelectedGroup, saveUserLedger } from "@/lib/storage";
 import type { EntryInput, EventMeta, GiftEntry, PendingDeletion, PersistedLedgerState } from "@/lib/types";
 import { createEntryId } from "@/lib/utils";
 
@@ -48,6 +48,7 @@ export const useGiftLedgerStore = create<GiftLedgerState>((set, get) => ({
     const entry: GiftEntry = {
       ...input,
       createdAt: new Date().toISOString(),
+      createdBy: activeUserId ?? undefined,
       id: createEntryId(),
     };
     const nextEntries = [entry, ...get().entries];
@@ -163,7 +164,7 @@ export const useGiftLedgerStore = create<GiftLedgerState>((set, get) => ({
   selectedGroup: null,
   setSelectedGroup: (group) => {
     try {
-      persistState(get().entries, group, get().eventMeta);
+      saveSelectedGroup(activeUserId, activeLedgerId, group);
       set({ selectedGroup: group, storageError: null });
     } catch {
       set({ selectedGroup: group, storageError: "필터 상태를 브라우저에 저장하지 못했습니다." });

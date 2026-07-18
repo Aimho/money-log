@@ -18,10 +18,11 @@ import { DEFAULT_SORT_MODE } from "@/lib/constants";
 import { formatAmountCompact } from "@/lib/amount";
 import { normalizeStoredGroupName } from "@/lib/group";
 import { buildGroupSummaries, buildLedgerSummary, filterEntries, sortEntries } from "@/lib/selectors";
+import { canDeleteCloudEntry } from "@/lib/supabase/ledger";
 import type { EntryInput, EventMeta, SortMode } from "@/lib/types";
 import { useGiftLedgerStore } from "@/store/useGiftLedgerStore";
 
-export function GiftLedgerApp({ canEditEvent = true, cloudControls, cloudError }: { canEditEvent?: boolean; cloudControls?: ReactNode; cloudError?: string | null }) {
+export function GiftLedgerApp({ canDeleteAllEntries = true, canEditEvent = true, cloudControls, cloudError, currentUserId }: { canDeleteAllEntries?: boolean; canEditEvent?: boolean; cloudControls?: ReactNode; cloudError?: string | null; currentUserId?: string }) {
   const {
     entries,
     eventMeta,
@@ -70,6 +71,7 @@ export function GiftLedgerApp({ canEditEvent = true, cloudControls, cloudError }
     [visibleEntries],
   );
   const shouldShowMobileFab = visibleEntries.length > 0;
+  const canDeleteEntry = (entry: typeof entries[number]) => canDeleteCloudEntry(entry, currentUserId, canDeleteAllEntries);
 
   const handleAddEntry = (input: EntryInput) => {
     addEntry(input);
@@ -123,7 +125,7 @@ export function GiftLedgerApp({ canEditEvent = true, cloudControls, cloudError }
           ) : sortedEntries.length === 0 ? (
             <EmptyState onClearFilter={() => setSelectedGroup(null)} variant="filtered" />
           ) : (
-            <EntryList entries={sortedEntries} hasPendingDeletion={Boolean(pendingDeletion)} onDelete={requestDeleteEntry} onSortChange={setSortMode} sortMode={sortMode} />
+            <EntryList canDeleteEntry={canDeleteEntry} entries={sortedEntries} hasPendingDeletion={Boolean(pendingDeletion)} key={`${selectedGroup ?? "all"}:${sortMode}`} onDelete={requestDeleteEntry} onSortChange={setSortMode} sortMode={sortMode} />
           )}
         </div>
 

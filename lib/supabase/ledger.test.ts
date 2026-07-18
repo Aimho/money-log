@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { canConfirmLedgerDeletion, deleteCloudLedger, entryToRow, mergeForImport, rowToEntry, type CloudLedger } from "@/lib/supabase/ledger";
+import { canConfirmLedgerDeletion, canDeleteCloudEntry, deleteCloudLedger, entryToRow, isInvalidInviteError, mergeForImport, rowToEntry, type CloudLedger } from "@/lib/supabase/ledger";
 import type { SupabaseBrowserClient } from "@/lib/supabase/client";
 import type { GiftEntry, PersistedLedgerState } from "@/lib/types";
 
@@ -14,6 +14,19 @@ const localEntry: GiftEntry = {
 };
 
 describe("Supabase ledger mapping", () => {
+  it("only lets editors delete their own entries while owners can delete all entries", () => {
+    const authored = { ...localEntry, createdBy: "editor-a" };
+    expect(canDeleteCloudEntry(authored, "editor-a", false)).toBe(true);
+    expect(canDeleteCloudEntry(authored, "editor-b", false)).toBe(false);
+    expect(canDeleteCloudEntry(authored, "owner", true)).toBe(true);
+    expect(canDeleteCloudEntry(localEntry, "editor-a", false)).toBe(false);
+  });
+
+  it("recognizes consumed or expired invite errors without swallowing other failures", () => {
+    expect(isInvalidInviteError({ code: "P0001", message: "Invite is invalid or expired" })).toBe(true);
+    expect(isInvalidInviteError({ code: "42501", message: "RLS failure" })).toBe(false);
+  });
+
   it("requires an exact ledger name before permanent deletion", () => {
     expect(canConfirmLedgerDeletion("민지 결혼식", "민지 결혼식")).toBe(true);
     expect(canConfirmLedgerDeletion(" 민지 결혼식", "민지 결혼식")).toBe(false);
@@ -35,7 +48,7 @@ describe("Supabase ledger mapping", () => {
   it("round-trips an entry without changing public app fields", () => {
     const row = entryToRow(localEntry, "ledger-id", "user-id");
     expect(row).toMatchObject({ created_by: "user-id", group_name: "친구", ledger_id: "ledger-id" });
-    expect(rowToEntry(row)).toEqual(localEntry);
+    expect(rowToEntry(row)).toEqual({ ...localEntry, createdBy: "user-id" });
   });
 
   it("merges a confirmed local import without overwriting remote metadata or duplicate IDs", () => {

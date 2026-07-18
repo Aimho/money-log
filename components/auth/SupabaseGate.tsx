@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GiftLedgerApp } from "@/components/gift-ledger/GiftLedgerApp";
 import { LedgerSkeleton } from "@/components/gift-ledger/LedgerSkeleton";
 import { buildAuthRedirect } from "@/lib/auth-redirect";
-import { configureCloudSync } from "@/lib/cloud-sync";
+import { configureCloudSync, drainLedgerOutbox } from "@/lib/cloud-sync";
 import type { CloudSyncChanges } from "@/lib/cloud-sync";
 import {
   createCloudLedger,
@@ -16,15 +16,15 @@ import {
   canConfirmLedgerDeletion,
   deleteCloudLedger,
   fetchCloudLedger,
+  isInvalidInviteError,
   mergeForImport,
   listCloudLedgers,
   syncCloudLedger,
-  type CloudLedger,
   type LedgerListItem,
 } from "@/lib/supabase/ledger";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { clearLocalLedgerState, clearPersistedLedger, getActiveLedgerId, hasCompletedLocalImport, loadLedgerOutbox, loadPersistedLedger, loadUserLedger, markLocalImportComplete, saveLedgerOutbox, setActiveLedgerId } from "@/lib/storage";
-import { EMPTY_OUTBOX, acknowledgeOutbox, mergeOutbox, reconcileRemote, reIdForImport } from "@/lib/sync-state";
+import { clearLocalLedgerState, clearPersistedLedger, getActiveLedgerId, loadLedgerOutbox, loadPersistedLedger, loadUserLedger, markLocalImportComplete, saveLedgerOutbox, setActiveLedgerId } from "@/lib/storage";
+import { EMPTY_OUTBOX, mergeOutbox, reconcileRemote, reIdForImport } from "@/lib/sync-state";
 import type { PersistedLedgerState } from "@/lib/types";
 import { useGiftLedgerStore } from "@/store/useGiftLedgerStore";
 
@@ -41,6 +41,15 @@ function getPendingInviteToken() {
 
 function hasLocalContent(state: PersistedLedgerState) {
   return state.entries.length > 0 || Boolean(state.eventMeta.name || state.eventMeta.date);
+}
+
+function emptyLedgerState(): PersistedLedgerState {
+  return { entries: [], eventMeta: { date: "", name: "" }, selectedGroup: null };
+}
+
+function completeLocalImport(userId: string) {
+  markLocalImportComplete(userId);
+  clearPersistedLedger();
 }
 
 function describeCloudError(error: unknown, fallback: string) {
@@ -163,20 +172,22 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [ledgers, setLedgers] = useState<LedgerListItem[]>([]);
   const [selectedLedgerId, setSelectedLedgerId] = useState<string | null>(null);
+  const [loadVersion, setLoadVersion] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletingLedger, setIsDeletingLedger] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [importChoice, setImportChoice] = useState<{ local: PersistedLedgerState; remote: CloudLedger | null } | null>(null);
   const ledgerIdRef = useRef<string | null>(null);
+  const requestedLedgerIdRef = useRef<string | null>(null);
   const isOwnerRef = useRef(true);
   const syncChainRef = useRef(Promise.resolve());
+  const drainingGenerationRef = useRef<number | null>(null);
+  const preLedgerOutboxRef = useRef(EMPTY_OUTBOX);
   const pendingDeletionIdsRef = useRef(new Set<string>());
   const pendingUpsertIdsRef = useRef(new Set<string>());
   const importPendingRef = useRef(false);
   const metadataPendingRef = useRef(false);
   const generationRef = useRef(0);
-  const isImportingRef = useRef(false);
   const userId = session.user.id;
 
   const queueSync = useCallback(
@@ -196,13 +207,15 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
       if (normalizedChanges.importPending) importPendingRef.current = true;
       if (normalizedChanges.metadataPending) metadataPendingRef.current = true;
       const ledgerForOutbox = ledgerIdRef.current;
-      let acknowledgedOutbox = EMPTY_OUTBOX;
       if (ledgerForOutbox) {
         const current = loadLedgerOutbox(userId, ledgerForOutbox);
-        acknowledgedOutbox = mergeOutbox(current, state, normalizedChanges);
-        saveLedgerOutbox(userId, ledgerForOutbox, acknowledgedOutbox);
+        saveLedgerOutbox(userId, ledgerForOutbox, mergeOutbox(current, state, normalizedChanges));
+      } else {
+        preLedgerOutboxRef.current = mergeOutbox(preLedgerOutboxRef.current, state, normalizedChanges);
       }
       if (isCurrent()) setSyncState("syncing");
+      if (drainingGenerationRef.current === generation) return;
+      drainingGenerationRef.current = generation;
       syncChainRef.current = syncChainRef.current
         .catch(() => undefined)
         .then(async () => {
@@ -210,23 +223,35 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
           let ledgerId = ledgerIdRef.current;
           if (!ledgerId) {
             ledgerId = await createCloudLedger(client, state.eventMeta);
+            if (!isCurrent()) return;
             ledgerIdRef.current = ledgerId;
             setActiveLedgerId(userId, ledgerId);
-            acknowledgedOutbox = mergeOutbox(EMPTY_OUTBOX, state, normalizedChanges);
-            saveLedgerOutbox(userId, ledgerId, acknowledgedOutbox);
+            saveLedgerOutbox(userId, ledgerId, preLedgerOutboxRef.current);
+            preLedgerOutboxRef.current = EMPTY_OUTBOX;
           }
-          const deletions = acknowledgedOutbox.deletedEntryIds;
-          const upserts = acknowledgedOutbox.upsertEntries.map((entry) => entry.id);
-          await syncCloudLedger(client, userId, ledgerId, state, isOwnerRef.current, deletions, upserts);
-          if (!isCurrent() || ledgerIdRef.current !== ledgerId) return;
-          const latestOutbox = loadLedgerOutbox(userId, ledgerId);
-          const remainingOutbox = acknowledgeOutbox(latestOutbox, acknowledgedOutbox, state, useGiftLedgerStore.getState());
-          saveLedgerOutbox(userId, ledgerId, remainingOutbox);
-          pendingDeletionIdsRef.current = new Set(remainingOutbox.deletedEntryIds);
-          pendingUpsertIdsRef.current = new Set(remainingOutbox.upsertEntries.map((entry) => entry.id));
-          importPendingRef.current = remainingOutbox.importPending;
-          metadataPendingRef.current = remainingOutbox.metadataPending;
-          if (acknowledgedOutbox.importPending) markLocalImportComplete(userId);
+          await drainLedgerOutbox({
+            getCurrentState: () => useGiftLedgerStore.getState(),
+            isCurrent: () => isCurrent() && ledgerIdRef.current === ledgerId,
+            loadOutbox: () => loadLedgerOutbox(userId, ledgerId),
+            onAcknowledged: (acknowledgedOutbox, remainingOutbox) => {
+              pendingDeletionIdsRef.current = new Set(remainingOutbox.deletedEntryIds);
+              pendingUpsertIdsRef.current = new Set(remainingOutbox.upsertEntries.map((entry) => entry.id));
+              importPendingRef.current = remainingOutbox.importPending;
+              metadataPendingRef.current = remainingOutbox.metadataPending;
+              if (acknowledgedOutbox.importPending) completeLocalImport(userId);
+            },
+            saveOutbox: (outbox) => saveLedgerOutbox(userId, ledgerId, outbox),
+            syncSnapshot: (currentState, outbox) => syncCloudLedger(
+              client,
+              userId,
+              ledgerId,
+              currentState,
+              isOwnerRef.current,
+              outbox.deletedEntryIds,
+              outbox.upsertEntries.map((entry) => entry.id),
+            ),
+          });
+          if (!isCurrent()) return;
           setCloudError(null);
           setSyncState("synced");
         })
@@ -234,6 +259,9 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
           if (!isCurrent()) return;
           setCloudError(describeCloudError(error, "클라우드 저장에 실패했습니다."));
           setSyncState("error");
+        })
+        .finally(() => {
+          if (drainingGenerationRef.current === generation) drainingGenerationRef.current = null;
         });
     },
     [client, session.user.id, userId],
@@ -241,15 +269,20 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
 
   useEffect(() => {
     const generation = ++generationRef.current;
+    preLedgerOutboxRef.current = EMPTY_OUTBOX;
     let cancelled = false;
-    isImportingRef.current = false;
     let releaseSync: () => void = () => undefined;
     const isCurrent = () => !cancelled && generationRef.current === generation;
     configureCloudSync(null);
-    const local = loadPersistedLedger();
+    let local = emptyLedgerState();
+    try {
+      local = loadPersistedLedger();
+    } catch {
+      setShareMessage("이 기기의 로컬 장부가 손상되어 클라우드 기록을 기준으로 불러왔습니다.");
+    }
 
     const inviteToken = getPendingInviteToken();
-    const cachedActiveLedger = selectedLedgerId ?? getActiveLedgerId(userId);
+    const cachedActiveLedger = requestedLedgerIdRef.current ?? getActiveLedgerId(userId);
     if (inviteToken) hydrateForUser(userId);
     else if (cachedActiveLedger) {
       ledgerIdRef.current = cachedActiveLedger;
@@ -260,27 +293,42 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
           window.sessionStorage.removeItem(PENDING_INVITE_KEY);
           if (isCurrent()) window.history.replaceState({}, "", window.location.pathname);
           return ledgerId;
+        }).catch((error: unknown) => {
+          if (!isInvalidInviteError(error)) throw error;
+          window.sessionStorage.removeItem(PENDING_INVITE_KEY);
+          if (isCurrent()) {
+            window.history.replaceState({}, "", window.location.pathname);
+            setShareMessage("초대 링크가 만료되었거나 이미 사용되었습니다. 접근 가능한 장부를 불러왔습니다.");
+          }
+          return undefined;
         })
       : Promise.resolve(cachedActiveLedger ?? undefined);
 
     void preferredLedger.then(async (preferredId) => {
       let ledgerList = await listCloudLedgers(client);
       let ledgerId = preferredId && ledgerList.some((item) => item.id === preferredId) ? preferredId : ledgerList[0]?.id;
+      let createdFromLocal = false;
       if (!ledgerId) {
-        ledgerId = await createCloudLedger(client, { date: "", name: "" });
+        ledgerId = await createCloudLedger(client, local.eventMeta);
+        createdFromLocal = true;
         ledgerList = await listCloudLedgers(client);
       }
       if (!isCurrent()) return null;
       setLedgers(ledgerList);
-      setSelectedLedgerId(ledgerId);
       const selected = ledgerList.find((item) => item.id === ledgerId);
       isOwnerRef.current = selected?.isOwner ?? true;
       setIsOwner(isOwnerRef.current);
       ledgerIdRef.current = ledgerId;
       setActiveLedgerId(userId, ledgerId);
       hydrateForLedger(userId, ledgerId);
-      const cached = loadUserLedger(userId, ledgerId);
-      const outbox = loadLedgerOutbox(userId, ledgerId);
+      let cached = emptyLedgerState();
+      let cacheReadable = true;
+      try {
+        cached = loadUserLedger(userId, ledgerId);
+      } catch {
+        cacheReadable = false;
+      }
+      const outbox = cacheReadable ? loadLedgerOutbox(userId, ledgerId) : EMPTY_OUTBOX;
       pendingDeletionIdsRef.current = new Set(outbox.deletedEntryIds);
       pendingUpsertIdsRef.current = new Set(outbox.upsertEntries.map((entry) => entry.id));
       importPendingRef.current = outbox.importPending;
@@ -289,19 +337,24 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
         await syncCloudLedger(client, userId, ledgerId, cached, isOwnerRef.current, outbox.deletedEntryIds, outbox.upsertEntries.map((entry) => entry.id));
         if (!isCurrent()) return null;
         saveLedgerOutbox(userId, ledgerId, EMPTY_OUTBOX);
-        if (outbox.importPending) markLocalImportComplete(userId);
+        if (outbox.importPending) completeLocalImport(userId);
       }
       const remote = await fetchCloudLedger(client, ledgerId);
-      return { cached, outbox, remote };
+      return { cached, createdFromLocal, outbox, remote };
     }).then((result) => {
         if (!result || !isCurrent()) return;
-        const { cached, outbox, remote } = result;
+        const { cached, createdFromLocal, outbox, remote } = result;
+        setSelectedLedgerId(remote?.ledgerId ?? null);
         ledgerIdRef.current = remote?.ledgerId ?? null;
         if (remote) setActiveLedgerId(userId, remote.ledgerId);
         setIsOwner(remote?.isOwner ?? true);
         isOwnerRef.current = remote?.isOwner ?? true;
-        if (remote?.isOwner && !hasCompletedLocalImport(userId) && !outbox.importPending && hasLocalContent(local)) {
-          setImportChoice({ local, remote });
+        if (createdFromLocal && remote && hasLocalContent(local)) {
+          const importedLocal = reIdForImport(local);
+          const nextState = mergeForImport(remote, importedLocal);
+          replaceLedger(nextState);
+          releaseSync = configureCloudSync(queueSync);
+          queueSync(nextState, { importPending: true, metadataPending: true, upsertEntryIds: importedLocal.entries.map((entry) => entry.id) });
           setIsReady(true);
           return;
         }
@@ -324,23 +377,7 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
       });
 
     return () => { cancelled = true; generationRef.current += 1; releaseSync(); };
-  }, [client, hydrateForLedger, hydrateForUser, queueSync, replaceLedger, selectedLedgerId, userId]);
-
-  const finishImport = (shouldImport: boolean) => {
-    if (!importChoice || isImportingRef.current) return;
-    isImportingRef.current = true;
-    const importedLocal = reIdForImport(importChoice.local);
-    const nextState = shouldImport
-      ? mergeForImport(importChoice.remote, importedLocal)
-      : importChoice.remote ?? useGiftLedgerStore.getState();
-    if (importChoice.remote) ledgerIdRef.current = importChoice.remote.ledgerId;
-    replaceLedger(nextState);
-    configureCloudSync(queueSync);
-    if (shouldImport || !importChoice.remote) queueSync(nextState, { importPending: shouldImport, metadataPending: shouldImport, upsertEntryIds: shouldImport ? importedLocal.entries.map((entry) => entry.id) : nextState.entries.map((entry) => entry.id) });
-    else markLocalImportComplete(userId);
-    if (shouldImport) clearPersistedLedger();
-    setImportChoice(null);
-  };
+  }, [client, hydrateForLedger, hydrateForUser, loadVersion, queueSync, replaceLedger, userId]);
 
   const shareLedger = async () => {
     const ledgerId = ledgerIdRef.current;
@@ -358,7 +395,8 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
   const switchLedger = (ledgerId: string) => {
     configureCloudSync(null);
     setIsReady(false);
-    setSelectedLedgerId(ledgerId);
+    requestedLedgerIdRef.current = ledgerId;
+    setLoadVersion((current) => current + 1);
   };
 
   const deleteLedger = async () => {
@@ -386,7 +424,8 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
       setIsReady(false);
       // Re-enter the existing hydration path. It selects another accessible
       // ledger, or creates a blank one when this was the user's last ledger.
-      setSelectedLedgerId(null);
+      requestedLedgerIdRef.current = null;
+      setLoadVersion((current) => current + 1);
     } catch (error: unknown) {
       configureCloudSync(queueSync);
       setDeleteError(describeCloudError(error, "클라우드 장부를 삭제하지 못했습니다."));
@@ -400,6 +439,7 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
   return (
     <>
       <GiftLedgerApp
+        canDeleteAllEntries={isOwner}
         canEditEvent={isOwner}
         cloudControls={
           <div className="mt-2 flex min-h-10 items-center justify-between gap-3 border-t border-[var(--border)] pt-2 text-xs text-[var(--muted)]">
@@ -448,9 +488,9 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
           </div>
         }
         cloudError={cloudError}
+        currentUserId={userId}
       />
       {shareMessage ? <div className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-[var(--radius-soft)] bg-[var(--ink)] px-4 py-3 text-center text-sm text-[var(--surface)] shadow-[var(--shadow-panel)]" role="status">{shareMessage}</div> : null}
-      {importChoice ? <ImportDialog hasRemote={Boolean(importChoice.remote)} onChoose={finishImport} /> : null}
       {deleteTarget ? (
         <DeleteLedgerDialog
           error={deleteError}
@@ -593,22 +633,6 @@ function KakaoAuthDialog({ client, isInvite, onClose }: {
         <p className="mt-4 text-center text-xs leading-5 text-[var(--ink-faint)]">
           로그인 없이도 이 기기의 내 장부는 계속 사용할 수 있습니다.
         </p>
-      </section>
-    </div>
-  );
-}
-
-function ImportDialog({ hasRemote, onChoose }: { hasRemote: boolean; onChoose: (shouldImport: boolean) => void }) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4" role="presentation">
-      <section aria-labelledby="import-title" aria-modal="true" className="w-full max-w-md rounded-[var(--radius-soft)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-panel)]" role="dialog">
-        <p className="text-xs font-semibold text-[var(--accent)]">최초 1회 확인</p>
-        <h2 className="mt-1 text-xl font-bold" id="import-title">이 기기의 기존 장부를 가져올까요?</h2>
-        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">가져오기를 선택해야만 기존 로컬 기록이 계정에 추가됩니다.{hasRemote ? " 클라우드 기록은 지우지 않고 합칩니다." : ""}</p>
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          <button className="min-h-11 rounded-[var(--radius-soft)] border border-[var(--border)] font-semibold active:scale-[0.98]" onClick={() => onChoose(false)} type="button">가져오지 않기</button>
-          <button className="min-h-11 rounded-[var(--radius-soft)] bg-[var(--accent)] font-semibold text-white active:scale-[0.98]" onClick={() => onChoose(true)} type="button">기존 장부 가져오기</button>
-        </div>
       </section>
     </div>
   );

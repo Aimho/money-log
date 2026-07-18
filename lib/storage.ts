@@ -4,12 +4,15 @@ import { EMPTY_OUTBOX, type LedgerOutbox } from "@/lib/sync-state";
 
 const IMPORT_MARKER_PREFIX = "gift-ledger-imported-v1:";
 const ACTIVE_LEDGER_PREFIX = "gift-ledger-active-v1:";
+const FILTER_SUFFIX = ":filter";
 
 function storageKeyForLedger(userId: string, ledgerId: string) {
   return `${STORAGE_KEY}:user:${userId}:ledger:${ledgerId}`;
 }
 
 function outboxKey(userId: string, ledgerId: string) { return `${STORAGE_KEY}:outbox:${userId}:${ledgerId}`; }
+
+function filterKey(storageKey: string) { return `${storageKey}${FILTER_SUFFIX}`; }
 
 function isEntry(value: unknown): value is GiftEntry {
   if (!value || typeof value !== "object") {
@@ -99,10 +102,21 @@ function loadLedgerAtKey(storageKey: string): PersistedLedgerState {
     throw new Error("저장된 항목 형식이 올바르지 않습니다.");
   }
 
+  const storedFilter = window.localStorage.getItem(filterKey(storageKey));
+  let selectedGroup = typeof parsed.selectedGroup === "string" ? parsed.selectedGroup : null;
+  if (storedFilter !== null) {
+    try {
+      const parsedFilter = JSON.parse(storedFilter) as unknown;
+      selectedGroup = typeof parsedFilter === "string" ? parsedFilter : null;
+    } catch {
+      window.localStorage.removeItem(filterKey(storageKey));
+    }
+  }
+
   return {
     entries: parsed.entries,
     eventMeta: parseEventMeta(parsed.eventMeta),
-    selectedGroup: typeof parsed.selectedGroup === "string" ? parsed.selectedGroup : null,
+    selectedGroup,
   };
 }
 
@@ -123,9 +137,17 @@ export function saveUserLedger(userId: string, ledgerId: string, state: Persiste
   window.localStorage.setItem(storageKeyForLedger(userId, ledgerId), JSON.stringify(state));
 }
 
+export function saveSelectedGroup(userId: string | null, ledgerId: string | null, selectedGroup: string | null) {
+  if (!hasStorage()) return;
+  const key = userId && ledgerId ? storageKeyForLedger(userId, ledgerId) : STORAGE_KEY;
+  window.localStorage.setItem(filterKey(key), JSON.stringify(selectedGroup));
+}
+
 export function clearUserLedger(userId: string, ledgerId: string) {
   if (!hasStorage()) return;
-  window.localStorage.removeItem(storageKeyForLedger(userId, ledgerId));
+  const key = storageKeyForLedger(userId, ledgerId);
+  window.localStorage.removeItem(key);
+  window.localStorage.removeItem(filterKey(key));
 }
 
 export function loadLedgerOutbox(userId: string, ledgerId: string): LedgerOutbox {
@@ -160,7 +182,9 @@ export function setActiveLedgerId(userId: string, ledgerId: string) {
 
 export function clearLocalLedgerState(userId: string, ledgerId: string) {
   if (!hasStorage()) return;
-  window.localStorage.removeItem(storageKeyForLedger(userId, ledgerId));
+  const key = storageKeyForLedger(userId, ledgerId);
+  window.localStorage.removeItem(key);
+  window.localStorage.removeItem(filterKey(key));
   window.localStorage.removeItem(outboxKey(userId, ledgerId));
   if (getActiveLedgerId(userId) === ledgerId) {
     window.localStorage.removeItem(`${ACTIVE_LEDGER_PREFIX}${userId}`);
@@ -173,4 +197,5 @@ export function clearPersistedLedger() {
   }
 
   window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem(filterKey(STORAGE_KEY));
 }
