@@ -542,7 +542,10 @@ function KakaoAuthDialog({ client, isInvite, onClose }: {
     setIsConnecting(true);
     const { error: authError } = await client.auth.signInWithOAuth({
       provider: "kakao",
-      options: { redirectTo: buildAuthRedirect(window.location) },
+      options: {
+        redirectTo: buildAuthRedirect(window.location),
+        scopes: "profile_nickname",
+      },
     });
     if (authError) {
       setError(describeCloudError(authError, "카카오 로그인을 시작하지 못했습니다."));
