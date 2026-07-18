@@ -1,3 +1,3 @@
-export function buildMagicLinkRedirect(location: Pick<Location, "origin" | "pathname" | "search">) {
-  return `${location.origin}${location.pathname}${location.search}`;
+export function buildAuthRedirect(location: Pick<Location, "origin" | "pathname">) {
+  return `${location.origin}${location.pathname}`;
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import type { Session } from "@supabase/supabase-js";
-import { Cloud, LogOut, RefreshCw, Share2, Trash2 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Cloud, CloudUpload, LogOut, RefreshCw, Share2, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GiftLedgerApp } from "@/components/gift-ledger/GiftLedgerApp";
 import { LedgerSkeleton } from "@/components/gift-ledger/LedgerSkeleton";
-import { buildMagicLinkRedirect } from "@/lib/auth-redirect";
+import { buildAuthRedirect } from "@/lib/auth-redirect";
 import { configureCloudSync } from "@/lib/cloud-sync";
 import type { CloudSyncChanges } from "@/lib/cloud-sync";
 import {
@@ -22,13 +22,22 @@ import {
   type CloudLedger,
   type LedgerListItem,
 } from "@/lib/supabase/ledger";
-import { createSupabaseBrowserClient, getSupabaseConfig } from "@/lib/supabase/client";
-import { clearLocalLedgerState, getActiveLedgerId, hasCompletedLocalImport, loadLedgerOutbox, loadPersistedLedger, loadUserLedger, markLocalImportComplete, saveLedgerOutbox, setActiveLedgerId } from "@/lib/storage";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { clearLocalLedgerState, clearPersistedLedger, getActiveLedgerId, hasCompletedLocalImport, loadLedgerOutbox, loadPersistedLedger, loadUserLedger, markLocalImportComplete, saveLedgerOutbox, setActiveLedgerId } from "@/lib/storage";
 import { EMPTY_OUTBOX, acknowledgeOutbox, mergeOutbox, reconcileRemote, reIdForImport } from "@/lib/sync-state";
 import type { PersistedLedgerState } from "@/lib/types";
 import { useGiftLedgerStore } from "@/store/useGiftLedgerStore";
 
 type SyncState = "idle" | "syncing" | "synced" | "error";
+const PENDING_INVITE_KEY = "money-log:pending-invite";
+
+function normalizeInviteToken(value: string | null) {
+  return value && value.length <= 256 && /^[A-Za-z0-9_-]+$/.test(value) ? value : null;
+}
+
+function getPendingInviteToken() {
+  return normalizeInviteToken(window.sessionStorage.getItem(PENDING_INVITE_KEY));
+}
 
 function hasLocalContent(state: PersistedLedgerState) {
   return state.entries.length > 0 || Boolean(state.eventMeta.name || state.eventMeta.date);
@@ -49,9 +58,23 @@ export function SupabaseGate() {
   const client = useMemo(() => createSupabaseBrowserClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(Boolean(client));
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [hasInvite, setHasInvite] = useState(false);
 
   useEffect(() => {
-    if (!client) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryInvite = normalizeInviteToken(searchParams.get("invite"));
+    if (queryInvite) window.sessionStorage.setItem(PENDING_INVITE_KEY, queryInvite);
+    if (searchParams.has("invite")) {
+      searchParams.delete("invite");
+      const remainingSearch = searchParams.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}${remainingSearch ? `?${remainingSearch}` : ""}${window.location.hash}`);
+    }
+    setHasInvite(Boolean(queryInvite ?? getPendingInviteToken()));
+    if (!client) {
+      setIsCheckingSession(false);
+      return;
+    }
     let cancelled = false;
     void client.auth.getSession().then(({ data }) => {
       if (cancelled) return;
@@ -64,10 +87,70 @@ export function SupabaseGate() {
     return () => { cancelled = true; data.subscription.unsubscribe(); };
   }, [client]);
 
-  if (!getSupabaseConfig() || !client) return <SupabaseSetup />;
   if (isCheckingSession) return <AuthLoading />;
-  if (!session) return <EmailOtpForm client={client} />;
-  return <SignedInLedger client={client} session={session} />;
+  if (session && client) return <SignedInLedger client={client} session={session} />;
+  return (
+    <GuestLedger
+      client={client}
+      hasInvite={hasInvite}
+      isAuthOpen={isAuthOpen}
+      onAuthClose={() => setIsAuthOpen(false)}
+      onAuthOpen={() => setIsAuthOpen(true)}
+      onInviteLeave={() => setHasInvite(false)}
+    />
+  );
+}
+
+function GuestLedger({ client, hasInvite, isAuthOpen, onAuthClose, onAuthOpen, onInviteLeave }: {
+  client: ReturnType<typeof createSupabaseBrowserClient>;
+  hasInvite: boolean;
+  isAuthOpen: boolean;
+  onAuthClose: () => void;
+  onAuthOpen: () => void;
+  onInviteLeave: () => void;
+}) {
+  const hydrate = useGiftLedgerStore((state) => state.hydrate);
+  const [isLocalReady, setIsLocalReady] = useState(false);
+
+  useEffect(() => {
+    configureCloudSync(null);
+    hydrate();
+    setIsLocalReady(true);
+  }, [hydrate]);
+
+  const leaveInvite = () => {
+    window.sessionStorage.removeItem(PENDING_INVITE_KEY);
+    window.history.replaceState({}, "", window.location.pathname);
+    onInviteLeave();
+    onAuthClose();
+  };
+
+  if (!isLocalReady) return <LedgerSkeleton />;
+
+  return (
+    <>
+      <GiftLedgerApp
+        cloudControls={
+          <div className="mt-2 flex min-h-10 items-center justify-between gap-3 border-t border-[var(--border)] pt-2 text-xs text-[var(--muted)]">
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Cloud aria-hidden="true" size={14} />
+              <span className="truncate">이 기기에 저장됨</span>
+            </span>
+            <button
+              className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-2 font-semibold text-[var(--ink)] transition-transform active:scale-95"
+              onClick={onAuthOpen}
+              type="button"
+            >
+              <CloudUpload aria-hidden="true" size={15} /> 클라우드 연결
+            </button>
+          </div>
+        }
+      />
+      {hasInvite || isAuthOpen ? (
+        <KakaoAuthDialog client={client} isInvite={hasInvite} onClose={hasInvite ? leaveInvite : onAuthClose} />
+      ) : null}
+    </>
+  );
 }
 
 function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<typeof createSupabaseBrowserClient>>; session: Session }) {
@@ -165,7 +248,7 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
     configureCloudSync(null);
     const local = loadPersistedLedger();
 
-    const inviteToken = new URLSearchParams(window.location.search).get("invite");
+    const inviteToken = getPendingInviteToken();
     const cachedActiveLedger = selectedLedgerId ?? getActiveLedgerId(userId);
     if (inviteToken) hydrateForUser(userId);
     else if (cachedActiveLedger) {
@@ -174,6 +257,7 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
     } else hydrateForUser(userId);
     const preferredLedger = inviteToken
       ? acceptLedgerInvite(client, inviteToken).then((ledgerId) => {
+          window.sessionStorage.removeItem(PENDING_INVITE_KEY);
           if (isCurrent()) window.history.replaceState({}, "", window.location.pathname);
           return ledgerId;
         })
@@ -216,7 +300,7 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
         if (remote) setActiveLedgerId(userId, remote.ledgerId);
         setIsOwner(remote?.isOwner ?? true);
         isOwnerRef.current = remote?.isOwner ?? true;
-        if (!hasCompletedLocalImport(userId) && !outbox.importPending && hasLocalContent(local)) {
+        if (remote?.isOwner && !hasCompletedLocalImport(userId) && !outbox.importPending && hasLocalContent(local)) {
           setImportChoice({ local, remote });
           setIsReady(true);
           return;
@@ -254,6 +338,7 @@ function SignedInLedger({ client, session }: { client: NonNullable<ReturnType<ty
     configureCloudSync(queueSync);
     if (shouldImport || !importChoice.remote) queueSync(nextState, { importPending: shouldImport, metadataPending: shouldImport, upsertEntryIds: shouldImport ? importedLocal.entries.map((entry) => entry.id) : nextState.entries.map((entry) => entry.id) });
     else markLocalImportComplete(userId);
+    if (shouldImport) clearPersistedLedger();
     setImportChoice(null);
   };
 
@@ -440,37 +525,73 @@ function DeleteLedgerDialog({ error, isDeleting, ledgerName, onCancel, onConfirm
   );
 }
 
-function EmailOtpForm({ client }: { client: NonNullable<ReturnType<typeof createSupabaseBrowserClient>> }) {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
+function KakaoAuthDialog({ client, isInvite, onClose }: {
+  client: ReturnType<typeof createSupabaseBrowserClient>;
+  isInvite: boolean;
+  onClose: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setIsSending(true);
-    setMessage(null);
-    const { error } = await client.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: buildMagicLinkRedirect(window.location), shouldCreateUser: true },
+  const signIn = async () => {
+    if (!client) {
+      setError("클라우드 설정을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    setError(null);
+    setIsConnecting(true);
+    const { error: authError } = await client.auth.signInWithOAuth({
+      provider: "kakao",
+      options: { redirectTo: buildAuthRedirect(window.location) },
     });
-    setIsSending(false);
-    setMessage(error ? "인증 메일을 보내지 못했습니다. 이메일을 확인해 주세요." : "메일함에서 로그인 링크를 눌러 주세요.");
+    if (authError) {
+      setError(describeCloudError(authError, "카카오 로그인을 시작하지 못했습니다."));
+      setIsConnecting(false);
+    }
   };
 
   return (
-    <AuthShell>
-      <p className="text-sm font-semibold text-[var(--accent)]">축하금 장부</p>
-      <h1 className="mt-2 text-2xl font-bold tracking-[-0.03em]">내 장부를 이어서 기록하세요</h1>
-      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">이메일로 받은 로그인 링크를 누르면 다른 기기에서도 같은 장부를 볼 수 있어요.</p>
-      <form className="mt-6" onSubmit={submit}>
-        <label className="text-sm font-semibold" htmlFor="login-email">이메일</label>
-        <input className="mt-2 min-h-11 w-full rounded-[var(--radius-soft)] border border-[var(--border)] bg-[var(--background)] px-3 outline-none focus:border-[var(--accent)]" id="login-email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
-        <button className="mt-3 min-h-11 w-full rounded-[var(--radius-soft)] bg-[var(--accent)] px-4 font-semibold text-white active:scale-[0.99] disabled:opacity-60" disabled={isSending} type="submit">
-          {isSending ? "보내는 중…" : "로그인 링크 받기"}
+    <div className="fixed inset-0 z-[70] grid place-items-center overscroll-contain bg-black/35 p-4" role="presentation">
+      <section
+        aria-describedby="kakao-auth-description"
+        aria-labelledby="kakao-auth-title"
+        aria-modal="true"
+        className="relative w-full max-w-sm rounded-[var(--radius-soft)] bg-[var(--surface)] p-6 shadow-[var(--shadow-panel)]"
+        role="dialog"
+      >
+        <button
+          aria-label={isInvite ? "초대 참여하지 않고 닫기" : "클라우드 연결 닫기"}
+          className="absolute right-3 top-3 grid size-10 place-items-center rounded-[var(--radius-soft)] text-[var(--muted)] transition-transform active:scale-95"
+          disabled={isConnecting}
+          onClick={onClose}
+          type="button"
+        >
+          <X aria-hidden="true" size={18} />
         </button>
-      </form>
-      {message ? <p className="mt-4 text-sm" role="status">{message}</p> : null}
-    </AuthShell>
+        <p className="text-xs font-bold text-[var(--accent)]">{isInvite ? "공유 장부 초대" : "선택 기능"}</p>
+        <h2 className="mt-2 pr-8 text-xl font-bold tracking-[-0.02em] text-balance" id="kakao-auth-title">
+          {isInvite ? "카카오 로그인 후 함께 기록하세요" : "이 장부를 클라우드에 연결할까요?"}
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)] text-pretty" id="kakao-auth-description">
+          {isInvite
+            ? "초대받은 장부는 참여자를 확인해야 열 수 있어요. 로그인 후 편집자로 바로 연결됩니다."
+            : "현재 기록은 이미 이 기기에 저장되어 있어요. 로그인하면 다른 기기에서도 보고 공유할 수 있습니다."}
+        </p>
+        <button
+          className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-soft)] bg-[#FEE500] px-4 font-semibold text-[#191919] transition-transform active:scale-[0.98] disabled:cursor-wait disabled:opacity-60"
+          disabled={isConnecting}
+          onClick={() => void signIn()}
+          type="button"
+        >
+          <span aria-hidden="true" className="grid size-5 place-items-center rounded-full bg-[#191919] text-[10px] font-black text-[#FEE500]">K</span>
+          {isConnecting ? "카카오로 이동하는 중…" : "카카오로 계속하기"}
+        </button>
+        {error ? <p className="mt-3 text-sm leading-5 text-red-800" role="alert">{error}</p> : null}
+        <p className="mt-4 text-center text-xs leading-5 text-[var(--ink-faint)]">
+          로그인 없이도 이 기기의 내 장부는 계속 사용할 수 있습니다.
+        </p>
+      </section>
+    </div>
   );
 }
 
@@ -490,14 +611,6 @@ function ImportDialog({ hasRemote, onChoose }: { hasRemote: boolean; onChoose: (
   );
 }
 
-function SupabaseSetup() {
-  return <AuthShell><p className="text-sm font-semibold text-[var(--accent)]">설정 필요</p><h1 className="mt-2 text-2xl font-bold">클라우드 연결을 준비해 주세요</h1><p className="mt-3 text-sm leading-6 text-[var(--muted)]"><code>.env.local</code>에 Supabase URL과 Publishable Key를 추가하면 로그인 화면이 열립니다. 자세한 순서는 README를 확인해 주세요.</p></AuthShell>;
-}
-
 function AuthLoading() {
   return <LedgerSkeleton />;
-}
-
-function AuthShell({ children }: { children: React.ReactNode }) {
-  return <main className="grid min-h-screen place-items-center bg-[var(--background)] p-4 text-[var(--ink)]"><section className="w-full max-w-md rounded-[var(--radius-soft)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-panel)]">{children}</section></main>;
 }

@@ -3,7 +3,7 @@
 행사별 축하금을 빠르게 기록하고 여러 사용자가 함께 관리할 수 있는 모바일 우선 장부입니다.
 
 - 운영 주소: [https://moeny-log.netlify.app](https://moeny-log.netlify.app)
-- 로그인: Supabase 이메일 매직링크
+- 로그인: 필요할 때만 사용하는 Supabase 카카오 OAuth
 - 저장소: Supabase Postgres + 브라우저 로컬 캐시
 
 ## 주요 기능
@@ -14,6 +14,7 @@
 - 그룹별 필터와 합계·평균·인원·그룹 수 집계
 - 최신순·금액순 정렬
 - 삭제 실행 취소
+- 로그인 없이 바로 사용하는 로컬 장부
 - 사용자별 클라우드 장부
 - 장부 소유자와 편집자 권한 분리
 - 7일 동안 유효한 일회용 공유 링크
@@ -69,9 +70,20 @@ supabase/migrations/20260718000000_initial_ledger.sql
 
 이미 일부 SQL이 실행된 프로젝트에서도 다시 실행할 수 있도록 중복 객체를 처리합니다.
 
-### 2. 이메일 로그인 활성화
+### 2. 카카오 로그인 활성화
 
-Supabase Dashboard에서 **Authentication → Providers → Email**을 활성화합니다. 앱은 비밀번호 대신 이메일 매직링크를 사용합니다.
+1. Kakao Developers에서 애플리케이션을 만들고 카카오 로그인을 활성화합니다.
+2. REST API 키 설정에 다음 Redirect URI를 등록합니다.
+
+   ```text
+   https://your-project.supabase.co/auth/v1/callback
+   ```
+
+3. REST API 키의 Client Secret을 활성화합니다.
+4. Supabase Dashboard의 **Authentication → Providers → Kakao**에 REST API 키를 Client ID로, Client Secret 코드를 Client Secret으로 등록합니다.
+5. 이메일 동의를 사용하지 않는 경우 **Allow users without an email**을 활성화합니다.
+
+카카오 Client Secret은 Supabase에만 등록하며 프론트엔드 환경변수나 저장소에 추가하지 않습니다.
 
 ### 3. URL Configuration
 
@@ -116,14 +128,17 @@ Node.js: 22
 
 1. 장부 소유자가 상단의 **공유** 버튼을 누릅니다.
 2. 생성된 링크를 참여자에게 전달합니다.
-3. 참여자는 본인 이메일로 로그인한 뒤 링크를 엽니다.
+3. 참여자는 링크를 열고 카카오로 로그인합니다.
 4. 참여자는 편집자로 등록되어 기록을 추가·수정·삭제할 수 있습니다.
 
 편집자는 행사 정보, 멤버, 장부 삭제를 관리할 수 없습니다. 공유 링크는 7일 동안 유효하고 한 번 사용하면 만료됩니다.
 
 ## 데이터 동기화
 
-- 브라우저 변경사항은 먼저 로컬 캐시와 동기화 대기열에 저장됩니다.
+- 로그인하지 않은 브라우저 변경사항은 로컬 장부에 저장됩니다.
+- 사용자가 **클라우드 연결**을 선택한 경우에만 카카오 로그인을 시작합니다.
+- 공유 링크로 접속한 비로그인 사용자는 초대 참여를 위해 카카오 로그인이 필요합니다.
+- 로그인한 브라우저 변경사항은 로컬 캐시와 동기화 대기열에 먼저 저장됩니다.
 - 온라인 상태에서는 Supabase와 자동으로 동기화합니다.
 - 동기화 실패 시 상단에 기기 저장 상태와 재시도 동작을 표시합니다.
 - 최초 로그인에서는 기존 로컬 장부를 계정에 가져올지 확인합니다.
@@ -143,9 +158,11 @@ npm run build
 
 - [ ] Netlify 환경변수 2개 등록
 - [ ] Supabase Site URL과 Redirect URLs 등록
-- [ ] Supabase Email provider 활성화
+- [ ] Kakao Developers Redirect URI와 Client Secret 설정
+- [ ] Supabase Kakao provider 활성화
 - [ ] 데이터베이스 마이그레이션 실행
-- [ ] 신규 사용자 매직링크 로그인 확인
+- [ ] 비로그인 로컬 입력과 새로고침 복원 확인
+- [ ] 신규 사용자 카카오 로그인 확인
 - [ ] 장부 생성과 클라우드 저장 확인
 - [ ] 다른 계정에서 공유 링크 참여 확인
 - [ ] 소유자와 편집자 권한 차이 확인
